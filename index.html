@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Water Rocket Telemetry Dashboard</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- MathJax for rendering equations -->
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #03060a;
+            --panel-bg: #0a1420;
+            --border-color: #1a2c42;
+            --text-main: #a3b8cc;
+            --cyan: #00f3ff;
+            --green: #39ff14;
+            --red: #ff003c;
+            --font-mono: 'Roboto Mono', 'Courier New', monospace;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: var(--font-mono);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .header {
+            background-color: #08111c;
+            border-bottom: 2px solid var(--cyan);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
+        }
+
+        .header h1 {
+            font-size: 22px;
+            color: var(--cyan);
+            text-shadow: 0 0 8px rgba(0, 243, 255, 0.6);
+            margin: 0;
+            letter-spacing: 2px;
+        }
+
+        #app-body {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Control Panel (Left) */
+        #controls {
+            width: 380px;
+            min-width: 380px;
+            background-color: var(--panel-bg);
+            border-right: 2px solid var(--border-color);
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .control-group {
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .control-group legend {
+            color: var(--cyan);
+            font-weight: bold;
+            padding: 0 8px;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+
+        .input-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 13px;
+        }
+
+        .input-row:last-child { margin-bottom: 0; }
+
+        .input-row label { flex: 1; }
+
+        .input-row input, .input-row select {
+            width: 110px;
+            background-color: #000;
+            color: var(--green);
+            border: 1px solid var(--border-color);
+            padding: 5px;
+            font-family: var(--font-mono);
+            text-align: right;
+        }
+
+        .input-row input:focus, .input-row select:focus {
+            outline: none;
+            border-color: var(--cyan);
+            box-shadow: 0 0 5px rgba(0, 243, 255, 0.3);
+        }
+
+        /* Buttons */
+        button {
+            background-color: transparent;
+            color: var(--cyan);
+            border: 1px solid var(--cyan);
+            padding: 10px 15px;
+            cursor: pointer;
+            font-family: var(--font-mono);
+            font-weight: bold;
+            text-transform: uppercase;
+            transition: all 0.2s;
+            font-size: 14px;
+            letter-spacing: 1px;
+        }
+
+        button:hover {
+            background-color: var(--cyan);
+            color: #000;
+            box-shadow: 0 0 10px rgba(0, 243, 255, 0.5);
+        }
+
+        .btn-green {
+            color: var(--green);
+            border-color: var(--green);
+        }
+
+        .btn-green:hover {
+            background-color: var(--green);
+            color: #000;
+            box-shadow: 0 0 10px rgba(57, 255, 20, 0.5);
+        }
+
+        .btn-block {
+            width: 100%;
+            display: block;
+            margin-top: 5px;
+        }
+
+        /* Telemetry Panel (Right) */
+        #telemetry {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+            gap: 15px;
+            overflow-y: auto;
+            background-color: var(--bg-color);
+        }
+
+        .status-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: stretch;
+            gap: 15px;
+        }
+
+        .status-box {
+            flex: 1;
+            border: 2px solid var(--green);
+            background: rgba(57, 255, 20, 0.05);
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: bold;
+            color: var(--green);
+            text-shadow: 0 0 8px rgba(57, 255, 20, 0.6);
+            text-align: center;
+            letter-spacing: 1px;
+        }
+
+        .status-box.error {
+            border-color: var(--red);
+            background: rgba(255, 0, 60, 0.05);
+            color: var(--red);
+            text-shadow: 0 0 8px rgba(255, 0, 60, 0.6);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 10px;
+        }
+
+        .stat-card {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: #728b9c;
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: var(--cyan);
+            margin-top: 5px;
+            text-shadow: 0 0 5px rgba(0, 243, 255, 0.4);
+        }
+
+        /* Charts */
+        .charts-wrapper {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 15px;
+            flex: 1;
+            min-height: 500px;
+        }
+
+        .chart-box {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            position: relative;
+        }
+
+        .chart-box.full-width {
+            grid-column: span 2;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 100%;
+            width: 100%;
+        }
+
+        /* Modal */
+        .modal {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .modal.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .modal-content {
+            background: var(--panel-bg);
+            border: 2px solid var(--cyan);
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.2);
+            padding: 30px;
+            width: 90%;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .close-btn {
+            position: absolute;
+            right: 15px;
+            top: 15px;
+            background: none;
+            border: none;
+            color: var(--red);
+            font-size: 30px;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .close-btn:hover {
+            color: #fff;
+            text-shadow: 0 0 10px var(--red);
+        }
+
+        .hidden { display: none !important; }
+        
+        /* Math block styling */
+        .math-section { margin-bottom: 25px; border-left: 3px solid var(--cyan); padding-left: 15px; }
+        .math-section h3 { color: var(--green); font-size: 16px; margin-bottom: 10px; }
+
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>[ WATER ROCKET TELEMETRY SYSTEM ]</h1>
+        <button onclick="document.getElementById('eq-modal').classList.add('active')">VIEW PHYSICS EQUATIONS</button>
+    </div>
+
+    <div id="app-body">
+        <!-- Control Panel -->
+        <aside id="controls">
+            
+            <div class="input-row" style="margin-bottom: 15px;">
+                <label style="color:var(--cyan); font-weight:bold; font-size: 16px;">MODE SELECT</label>
+                <select id="in-mode" onchange="toggleMode()" style="font-size: 14px; width: 180px; color: var(--cyan); border-color: var(--cyan);">
+                    <option value="AIR">AIR PUMP MODE</option>
+                    <option value="CHEM">CHEMICAL REACTION</option>
+                </select>
+            </div>
+
+            <fieldset class="control-group">
+                <legend>Energy & Propellant</legend>
+                <div class="input-row">
+                    <label>Bottle Volume (L)</label>
+                    <input type="number" id="in-v-bottle" value="2.0" step="0.1" onchange="runSimUI()">
+                </div>
+                <div class="input-row" id="row-water-ratio">
+                    <label>Water Ratio (%)</label>
+                    <input type="number" id="in-water-ratio" value="35" step="1" onchange="runSimUI()">
+                </div>
+                <div class="input-row" id="row-air-pressure">
+                    <label>Initial Pressure (PSI)</label>
+                    <input type="number" id="in-pressure" value="80" step="5" onchange="runSimUI()">
+                </div>
+            </fieldset>
+
+            <fieldset class="control-group hidden" id="group-chem">
+                <legend>Chemical Reaction parameters</legend>
+                <div class="input-row">
+                    <label>Carbonate Salt</label>
+                    <select id="in-salt-type" onchange="runSimUI()" style="width: 140px;">
+                        <option value="84">Baking Soda</option>
+                        <option value="106">Washing Soda</option>
+                    </select>
+                </div>
+                <div class="input-row">
+                    <label>Mass of Salt (g)</label>
+                    <input type="number" id="in-mass-salt" value="60" step="5" onchange="runSimUI()">
+                </div>
+                <div class="input-row">
+                    <label>Vinegar Volume (ml)</label>
+                    <input type="number" id="in-vol-vinegar" value="600" step="50" onchange="runSimUI()">
+                </div>
+                <div class="input-row">
+                    <label>Acid Conc. % (m/v)</label>
+                    <input type="number" id="in-acid-conc" value="5" step="1" onchange="runSimUI()">
+                </div>
+                <div class="input-row">
+                    <label>Pop-off Pressure (PSI)</label>
+                    <input type="number" id="in-popoff" value="60" step="5" onchange="runSimUI()">
+                </div>
+                <div class="input-row">
+                    <label>Burst Limit (PSI)</label>
+                    <input type="number" id="in-burst" value="150" step="5" onchange="runSimUI()" style="color:var(--red);">
+                </div>
+            </fieldset>
+
+            <fieldset class="control-group">
+                <legend>Thrust System</legend>
+                <div class="input-row">
+                    <label>Nozzle Dia. (mm)</label>
+                    <input type="number" id="in-d-nozzle" value="21" step="0.5" onchange="runSimUI()">
+                </div>
+                <div class="input-row">
+                    <label>Launch Tube Len. (m)</label>
+                    <input type="number" id="in-l-tube" value="0.3" step="0.05" onchange="runSimUI()">
+                </div>
+                <div class="input-row">
+                    <label>Launch Tube Dia. (mm)</label>
+                    <input type="number" id="in-d-tube" value="21" step="0.5" onchange="runSimUI()">
+                </div>
+            </fieldset>
+
+            <fieldset class="control-group">
+                <legend>Aerodynamics & Mass</legend>
+                <div class="input-row">
+                    <label>Body Dia. (mm)</label>
+                    <input type="number" id="in-d-body" value="100" step="5" onchange="runSimUI()">
+                </div>
+                <div class="input-row">
+                    <label>Drag Coeff. (Cd)</label>
+                    <input type="number" id="in-cd" value="0.35" step="0.01" onchange="runSimUI()">
+                </div>
+                <div class="input-row">
+                    <label>Empty Mass (kg)</label>
+                    <input type="number" id="in-m-empty" value="0.10" step="0.01" onchange="runSimUI()">
+                </div>
+                <div class="input-row">
+                    <label>Nose Ballast (kg)</label>
+                    <input type="number" id="in-m-ballast" value="0.05" step="0.01" onchange="runSimUI()">
+                </div>
+            </fieldset>
+
+            <fieldset class="control-group">
+                <legend>Trajectory & Environment</legend>
+                <div class="input-row">
+                    <label>Launch Angle (deg)</label>
+                    <input type="number" id="in-angle" value="45" step="1" onchange="runSimUI()">
+                </div>
+                <div class="input-row">
+                    <label>Air Temp (C)</label>
+                    <input type="number" id="in-temp" value="15" step="1" onchange="runSimUI()">
+                </div>
+                <div class="input-row">
+                    <label>Environment</label>
+                    <select id="in-env" onchange="runSimUI()" style="width: 140px;">
+                        <option value="1.225">Sea Level (0m)</option>
+                        <option value="1.056">Ta Xua (1500m)</option>
+                    </select>
+                </div>
+            </fieldset>
+
+            <button class="btn-block btn-green" id="btn-optimize" onclick="optimizeRange()" style="margin-top: 10px; padding: 15px; font-size: 16px;">
+                > OPTIMIZE RANGE <
+            </button>
+            <button class="btn-block" onclick="runSimUI()" style="margin-top: 10px;">FORCE RECALCULATE</button>
+
+        </aside>
+
+        <!-- Telemetry Panel -->
+        <main id="telemetry">
+            
+            <div class="status-container">
+                <div id="sys-status" class="status-box">NOMINAL</div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Actual Range</div>
+                    <div class="stat-value" id="val-range">0.00 m</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Ideal Vacuum Range</div>
+                    <div class="stat-value" id="val-ideal-range" style="color:#728b9c;">0.00 m</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Apogee (Max Alt)</div>
+                    <div class="stat-value" id="val-apogee">0.00 m</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Max Velocity</div>
+                    <div class="stat-value" id="val-max-v">0.00 m/s</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Flight Time</div>
+                    <div class="stat-value" id="val-flight-time">0.00 s</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Burn Time</div>
+                    <div class="stat-value" id="val-burn-time">0.000 s</div>
+                </div>
+            </div>
+
+            <div class="charts-wrapper">
+                <div class="chart-box full-width">
+                    <div class="chart-container">
+                        <canvas id="chart-traj"></canvas>
+                    </div>
+                </div>
+                <div class="chart-box">
+                    <div class="chart-container">
+                        <canvas id="chart-dyn"></canvas>
+                    </div>
+                </div>
+                <div class="chart-box">
+                    <div class="chart-container">
+                        <canvas id="chart-kin"></canvas>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Equation Modal -->
+    <div id="eq-modal" class="modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="document.getElementById('eq-modal').classList.remove('active')">&times;</button>
+            <h2 style="color:var(--cyan); margin-bottom: 20px; text-transform: uppercase; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">Runge-Kutta 4 (RK4) Mathematical Engine</h2>
+            
+            <div class="math-section">
+                <h3>1. Thrust System (Bernoulli & Newton)</h3>
+                <p>$$ F_T = \dot{m}_w \cdot v_e = 2 A_e (P(t) - P_{atm}) $$</p>
+                <p>$$ v_e = \sqrt{\frac{2(P(t) - P_{atm})}{\rho_{liquid}}} $$</p>
+            </div>
+
+            <div class="math-section">
+                <h3>2. Gas Phase (Choked Flow Venturi)</h3>
+                <p>Critical pressure ratio for sonic limit ($\gamma \approx 1.34$ for wet air):</p>
+                <p>$$ \alpha_c = \left( \frac{2}{\gamma + 1} \right)^{\frac{\gamma}{\gamma - 1}} \approx 0.455 $$</p>
+                <p>If $P_{atm} / P(t) < 0.455$, flow is choked at Mach 1 ($c = \sqrt{\gamma R T}$).</p>
+            </div>
+
+            <div class="math-section">
+                <h3>3. Aerodynamics & Drag</h3>
+                <p>$$ F_D = \frac{1}{2} \rho_{air} v^2 C_D A_{ref} $$</p>
+            </div>
+
+            <div class="math-section">
+                <h3>4. Thermodynamics (Polytropic Expansion)</h3>
+                <p>The system undergoes adiabatic expansion where heat transfer is minimal but latent heat of condensation alters $\gamma$.</p>
+                <p>$$ P(t) \cdot V_{air}(t)^\gamma = \text{const} \implies \frac{dP}{dt} = -\gamma \frac{P(t)}{V_{air}(t)} \frac{dV_{air}}{dt} $$</p>
+            </div>
+
+            <div class="math-section">
+                <h3>5. Ordinary Differential Equations of Motion (ODE)</h3>
+                <p>$$ \frac{dx}{dt} = v_x, \quad \frac{dy}{dt} = v_y $$</p>
+                <p>$$ \frac{dv_x}{dt} = \frac{F_T \cos\theta - F_D \frac{v_x}{v}}{m(t)} $$</p>
+                <p>$$ \frac{dv_y}{dt} = \frac{F_T \sin\theta - F_D \frac{v_y}{v} - m(t)g}{m(t)} $$</p>
+                <p>$$ \frac{dm}{dt} = -\rho_{liquid} A_e v_e \quad \text{(Mass depletion rate)} $$</p>
+            </div>
+
+            <div class="math-section">
+                <h3>6. Tsiolkovsky Ideal Vacuum Range</h3>
+                <p>$$ v_0 = v_{e} \ln\left(1 + \frac{m_{liquid}}{m_{dry}}\right) \implies R_{max} = \frac{v_0^2 \sin(2\theta)}{g} $$</p>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- CONSTANTS ---
+        const g = 9.81;
+        const R_spec = 287.05; // Specific gas constant for air
+        const gamma = 1.34;    // Polytropic expansion of saturated air
+        const P_atm = 101325;  // 1 atm in Pa
+
+        // --- CHART INSTANCES ---
+        let chartTraj, chartDyn, chartKin;
+
+        function initCharts() {
+            Chart.defaults.color = '#728b9c';
+            Chart.defaults.font.family = "'Roboto Mono', monospace";
+            Chart.defaults.borderColor = '#1a2c42';
+
+            const commonOptions = {
+                responsive: true, maintainAspectRatio: false,
+                animation: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: { legend: { labels: { font: { size: 11 } } } }
+            };
+
+            // Trajectory
+            chartTraj = new Chart(document.getElementById('chart-traj'), {
+                type: 'scatter',
+                data: { datasets: [] },
+                options: {
+                    ...commonOptions,
+                    scales: {
+                        x: { type: 'linear', position: 'bottom', title: {display: true, text: 'Range (m)', color: '#00f3ff'}, grid: {color: '#1a2c42'} },
+                        y: { title: {display: true, text: 'Altitude (m)', color: '#00f3ff'}, grid: {color: '#1a2c42'} }
+                    }
+                }
+            });
+
+            // Dynamics
+            chartDyn = new Chart(document.getElementById('chart-dyn'), {
+                type: 'line',
+                data: { datasets: [] },
+                options: {
+                    ...commonOptions,
+                    elements: { point: { radius: 0 }, line: { borderWidth: 2 } },
+                    scales: {
+                        x: { type: 'linear', title: {display: true, text: 'Time (s)'} },
+                        yT: { type: 'linear', position: 'left', title: {display: true, text: 'Thrust (N)'}, grid: {display: false} },
+                        yP: { type: 'linear', position: 'right', title: {display: true, text: 'Pressure (PSI)'}, grid: {display: false} }
+                    }
+                }
+            });
+
+            // Kinematics
+            chartKin = new Chart(document.getElementById('chart-kin'), {
+                type: 'line',
+                data: { datasets: [] },
+                options: {
+                    ...commonOptions,
+                    elements: { point: { radius: 0 }, line: { borderWidth: 2 } },
+                    scales: {
+                        x: { type: 'linear', title: {display: true, text: 'Time (s)'} },
+                        yA: { type: 'linear', position: 'left', title: {display: true, text: 'Altitude (m)'}, grid: {display: false} },
+                        yV: { type: 'linear', position: 'right', title: {display: true, text: 'Velocity (m/s)'}, grid: {display: false} }
+                    }
+                }
+            });
+        }
+
+        // --- UI LOGIC ---
+        function toggleMode() {
+            const mode = document.getElementById('in-mode').value;
+            const chemPanel = document.getElementById('group-chem');
+            const airPressureRow = document.getElementById('row-air-pressure');
+            
+            if (mode === "CHEM") {
+                chemPanel.classList.remove('hidden');
+                airPressureRow.classList.add('hidden');
+                // Auto calculate water ratio based on vinegar volume
+                document.getElementById('in-water-ratio').disabled = true;
+            } else {
+                chemPanel.classList.add('hidden');
+                airPressureRow.classList.remove('hidden');
+                document.getElementById('in-water-ratio').disabled = false;
+            }
+            runSimUI();
+        }
+
+        function setStatus(text, isError = false) {
+            const box = document.getElementById('sys-status');
+            box.innerText = text;
+            if (isError) box.classList.add('error');
+            else box.classList.remove('error');
+        }
+
+        // --- PHYSICS ENGINE (RK4) ---
+        const Engine = {
+            compute_derivatives: function(t, Y, params) {
+                // Y = [x, y, vx, vy, m_water, P_curr]
+                let x = Y[0], y = Y[1], vx = Y[2], vy = Y[3], m_w = Y[4], P = Y[5];
+                
+                let v_mag = Math.sqrt(vx*vx + vy*vy);
+                let Fd = 0.5 * params.rho_a * params.Cd * params.A_ref * v_mag * v_mag;
+                
+                let cos_th = v_mag === 0 ? Math.cos(params.theta0) : vx / v_mag;
+                let sin_th = v_mag === 0 ? Math.sin(params.theta0) : vy / v_mag;
+                
+                let dist = Math.sqrt(x*x + y*y);
+                
+                let Thrust = 0;
+                let dm_dt = 0;
+                let dP_dt = 0;
+                
+                let m_total = params.m_dry + Math.max(0, m_w);
+                
+                if (m_w > 0) {
+                    // Water or Tube phase
+                    let P_eff = Math.max(0, P - P_atm);
+                    let dV_air_dt = 0;
+                    
+                    if (dist < params.L_tube) {
+                        // Tube phase: works like a piston
+                        Thrust = P_eff * params.A_tube;
+                        dV_air_dt = params.A_tube * v_mag;
+                        dm_dt = 0;
+                    } else {
+                        // Water thrust phase
+                        let ve = Math.sqrt(2 * P_eff / params.rho_fluid);
+                        let mdot = params.rho_fluid * params.A_e * ve;
+                        Thrust = mdot * ve;
+                        dV_air_dt = params.A_e * ve;
+                        dm_dt = -mdot;
+                    }
+                    
+                    let V_air = params.V_bottle - (m_w / params.rho_fluid);
+                    if (V_air <= 0.0001) V_air = 0.0001;
+                    dP_dt = -gamma * (P / V_air) * dV_air_dt;
+                    
+                } else if (P > P_atm * 1.01) {
+                    // Gas thrust phase (Choked Flow)
+                    let pratio = P_atm / P;
+                    let choke_limit = 0.455;
+                    let mdot_gas, v_gas;
+                    
+                    if (pratio < choke_limit) { // Choked
+                        v_gas = Math.sqrt(gamma * R_spec * params.T_env);
+                        let coeff = Math.sqrt(gamma / (R_spec * params.T_env)) * Math.pow(2 / (gamma + 1), (gamma + 1) / (2 * (gamma - 1)));
+                        mdot_gas = params.A_e * P * coeff;
+                        Thrust = mdot_gas * v_gas + (P * choke_limit - P_atm) * params.A_e;
+                    } else { // Subsonic
+                        let mach_sq = (2 / (gamma - 1)) * (Math.pow(1 / pratio, (gamma - 1) / gamma) - 1);
+                        mach_sq = Math.max(0, mach_sq);
+                        v_gas = Math.sqrt(mach_sq * gamma * R_spec * params.T_env);
+                        let T_exit = params.T_env / (1 + (gamma - 1) / 2 * mach_sq);
+                        let rho_exit = P_atm / (R_spec * T_exit);
+                        mdot_gas = params.A_e * rho_exit * v_gas;
+                        Thrust = mdot_gas * v_gas;
+                    }
+                    
+                    let rho_chamber = P / (R_spec * params.T_env);
+                    let dV_gas = mdot_gas / rho_chamber;
+                    dP_dt = -gamma * (P / params.V_bottle) * dV_gas;
+                    dm_dt = 0; // Gas mass is neglected in structural mass to save computation
+                } else {
+                    dP_dt = -P; // Rapidly decay to 0 differential
+                    Thrust = 0;
+                }
+                
+                params.last_Thrust = Thrust; // save for telemetry
+                
+                let ax, ay;
+                if (dist < params.L_tube) {
+                    // Constrain movement along launch tube
+                    let a_tube = (Thrust - Fd - m_total * g * Math.sin(params.theta0)) / m_total;
+                    if (a_tube < 0 && v_mag === 0) a_tube = 0; // Can't fall through pad
+                    ax = a_tube * Math.cos(params.theta0);
+                    ay = a_tube * Math.sin(params.theta0);
+                } else {
+                    // Free flight Gravity Turn
+                    ax = (Thrust * cos_th - Fd * cos_th) / m_total;
+                    ay = (Thrust * sin_th - Fd * sin_th) / m_total - g;
+                }
+                
+                return [vx, vy, ax, ay, dm_dt, dP_dt];
+            },
+
+            simulate: function(params) {
+                const MAX_STEPS = 50000;
+                const out = {
+                    t: new Float64Array(MAX_STEPS),
+                    x: new Float64Array(MAX_STEPS),
+                    y: new Float64Array(MAX_STEPS),
+                    v: new Float64Array(MAX_STEPS),
+                    T: new Float64Array(MAX_STEPS),
+                    P: new Float64Array(MAX_STEPS),
+                    ptr: 0,
+                    apogee: 0,
+                    max_vel: 0,
+                    burn_time: 0
+                };
+
+                let Y = [0, 0, 0, 0, params.m_water_init, params.P_init];
+                let t = 0;
+                let step_count = 0;
+
+                while (Y[1] >= 0 && t < 120 && out.ptr < MAX_STEPS - 1) {
+                    // Dynamic time step: super fine during thrust, coarse during coast
+                    let isThrusting = (Y[4] > 0 || Y[5] > P_atm * 1.01);
+                    let dt = isThrusting ? 0.0001 : 0.01;
+                    
+                    // Downsample saving to arrays so charts don't crash browser
+                    let save_interval = isThrusting ? 50 : 2;
+                    
+                    if (step_count % save_interval === 0) {
+                        // evaluate derivatives just to get the side-effect Thrust for logging
+                        this.compute_derivatives(t, Y, params);
+                        out.t[out.ptr] = t;
+                        out.x[out.ptr] = Y[0];
+                        out.y[out.ptr] = Y[1];
+                        out.v[out.ptr] = Math.sqrt(Y[2]*Y[2] + Y[3]*Y[3]);
+                        out.T[out.ptr] = params.last_Thrust;
+                        out.P[out.ptr] = (Y[5] - P_atm) / 6894.76; // PSI Gauge
+                        
+                        if (Y[1] > out.apogee) out.apogee = Y[1];
+                        if (out.v[out.ptr] > out.max_vel) out.max_vel = out.v[out.ptr];
+                        if (params.last_Thrust > 0.1) out.burn_time = t;
+                        
+                        out.ptr++;
+                    }
+                    
+                    // RK4 Integration
+                    let k1 = this.compute_derivatives(t, Y, params);
+                    let Y2 = []; for(let i=0; i<6; i++) Y2[i] = Y[i] + 0.5*dt*k1[i];
+                    
+                    let k2 = this.compute_derivatives(t + 0.5*dt, Y2, params);
+                    let Y3 = []; for(let i=0; i<6; i++) Y3[i] = Y[i] + 0.5*dt*k2[i];
+                    
+                    let k3 = this.compute_derivatives(t + 0.5*dt, Y3, params);
+                    let Y4 = []; for(let i=0; i<6; i++) Y4[i] = Y[i] + dt*k3[i];
+                    
+                    let k4 = this.compute_derivatives(t + dt, Y4, params);
+                    
+                    for(let i=0; i<6; i++) {
+                        Y[i] = Y[i] + (dt/6) * (k1[i] + 2*k2[i] + 2*k3[i] + k4[i]);
+                    }
+                    
+                    // Floor constraints
+                    if (Y[4] < 0) Y[4] = 0; // Water mass can't be negative
+                    
+                    t += dt;
+                    step_count++;
+                }
+                
+                return out;
+            }
+        };
+
+        function getParamsFromUI() {
+            let mode = document.getElementById('in-mode').value;
+            let V_bottle = parseFloat(document.getElementById('in-v-bottle').value) / 1000; // m3
+            
+            let params = {
+                theta0: parseFloat(document.getElementById('in-angle').value) * Math.PI / 180,
+                V_bottle: V_bottle,
+                A_e: Math.PI / 4 * Math.pow(parseFloat(document.getElementById('in-d-nozzle').value)/1000, 2),
+                L_tube: parseFloat(document.getElementById('in-l-tube').value),
+                A_tube: Math.PI / 4 * Math.pow(parseFloat(document.getElementById('in-d-tube').value)/1000, 2),
+                A_ref: Math.PI / 4 * Math.pow(parseFloat(document.getElementById('in-d-body').value)/1000, 2),
+                Cd: parseFloat(document.getElementById('in-cd').value),
+                m_dry: parseFloat(document.getElementById('in-m-empty').value) + parseFloat(document.getElementById('in-m-ballast').value),
+                rho_a: parseFloat(document.getElementById('in-env').value),
+                T_env: parseFloat(document.getElementById('in-temp').value) + 273.15,
+                g: g,
+                P_atm: P_atm
+            };
+
+            let V_liquid, rho_fluid, P_init_Pa;
+            let exploded = false;
+            let status = "NOMINAL";
+
+            if (mode === "AIR") {
+                let wRatio = parseFloat(document.getElementById('in-water-ratio').value);
+                V_liquid = V_bottle * (wRatio / 100);
+                rho_fluid = 1000;
+                P_init_Pa = parseFloat(document.getElementById('in-pressure').value) * 6894.76 + P_atm;
+            } else {
+                let vol_vin = parseFloat(document.getElementById('in-vol-vinegar').value); // ml
+                V_liquid = vol_vin / 1000000; // m3
+                
+                // Update ratio UI
+                document.getElementById('in-water-ratio').value = ((V_liquid / V_bottle)*100).toFixed(1);
+
+                let acid_conc = parseFloat(document.getElementById('in-acid-conc').value);
+                let mass_acid = vol_vin * (acid_conc / 100);
+                let mol_acid = mass_acid / 60.05;
+
+                let salt_type = parseFloat(document.getElementById('in-salt-type').value); // 84 or 106
+                let mass_salt = parseFloat(document.getElementById('in-mass-salt').value);
+                let mol_salt = mass_salt / salt_type;
+
+                let mol_co2 = (salt_type === 84) ? Math.min(mol_acid, mol_salt) : Math.min(mol_acid/2, mol_salt);
+                
+                let V_air = V_bottle - V_liquid;
+                let P_calc = (mol_co2 * 8.314 * params.T_env) / V_air + P_atm;
+                let P_calc_PSI = (P_calc - P_atm) / 6894.76;
+
+                let p_pop = parseFloat(document.getElementById('in-popoff').value);
+                let p_burst = parseFloat(document.getElementById('in-burst').value);
+
+                if (P_calc_PSI > p_burst) {
+                    exploded = true;
+                    status = `BURST WARNING: > ${p_burst} PSI`;
+                } else if (P_calc_PSI < p_pop) {
+                    exploded = true;
+                    status = `FAILURE: REACHED ONLY ${P_calc_PSI.toFixed(1)} PSI (POPOFF: ${p_pop})`;
+                } else {
+                    P_init_Pa = p_pop * 6894.76 + P_atm;
+                    status = `SUCCESS: POPS OFF AT ${p_pop} PSI`;
+                }
+                
+                rho_fluid = ((vol_vin * 1.0) + mass_salt) / vol_vin * 1000;
+            }
+
+            params.m_water_init = V_liquid * rho_fluid;
+            params.P_init = P_init_Pa;
+            params.rho_fluid = rho_fluid;
+            params.exploded = exploded;
+            params.status = status;
+
+            return params;
+        }
+
+        function runSimUI(silent = false) {
+            const params = getParamsFromUI();
+            
+            if (!silent) setStatus(params.status, params.exploded);
+            
+            if (params.exploded) {
+                if(!silent) clearCharts();
+                return null;
+            }
+
+            const res = Engine.simulate(params);
+
+            // Calculate Tsiolkovsky Ideal trajectory
+            let u_eq = Math.sqrt(2 * (params.P_init - P_atm) / params.rho_fluid);
+            let v0_ideal = u_eq * Math.log(1 + params.m_water_init / params.m_dry);
+            let ideal_range = (v0_ideal * v0_ideal * Math.sin(2 * params.theta0)) / g;
+
+            if (!silent) {
+                updateUI(res, ideal_range, v0_ideal, params);
+            }
+
+            return { range: res.x[res.ptr-1], apogee: res.apogee, ideal_range: ideal_range };
+        }
+
+        function updateUI(res, ideal_range, v0_ideal, params) {
+            // Stats
+            document.getElementById('val-range').innerText = res.x[res.ptr-1].toFixed(2) + ' m';
+            document.getElementById('val-ideal-range').innerText = ideal_range.toFixed(2) + ' m';
+            document.getElementById('val-apogee').innerText = res.apogee.toFixed(2) + ' m';
+            document.getElementById('val-max-v').innerText = res.max_vel.toFixed(2) + ' m/s';
+            document.getElementById('val-flight-time').innerText = res.t[res.ptr-1].toFixed(2) + ' s';
+            document.getElementById('val-burn-time').innerText = res.burn_time.toFixed(3) + ' s';
+
+            // Prepare Data arrays
+            let t_data = Array.from(res.t.slice(0, res.ptr));
+            let x_data = Array.from(res.x.slice(0, res.ptr));
+            let y_data = Array.from(res.y.slice(0, res.ptr));
+            
+            let traj_points = [];
+            for(let i=0; i<res.ptr; i++) {
+                traj_points.push({x: res.x[i], y: res.y[i]});
+            }
+
+            // Ideal Trajectory points
+            let ideal_points = [];
+            let t_flight_ideal = (2 * v0_ideal * Math.sin(params.theta0)) / g;
+            for(let i=0; i<=50; i++) {
+                let ti = (i/50) * t_flight_ideal;
+                let xi = v0_ideal * Math.cos(params.theta0) * ti;
+                let yi = v0_ideal * Math.sin(params.theta0) * ti - 0.5 * g * ti * ti;
+                if(yi >= 0) ideal_points.push({x: xi, y: yi});
+            }
+
+            // Update Trajectory Chart
+            chartTraj.data.datasets = [
+                {
+                    label: 'Actual Trajectory (RK4)',
+                    data: traj_points,
+                    backgroundColor: '#00f3ff',
+                    showLine: true,
+                    borderColor: '#00f3ff',
+                    borderWidth: 2,
+                    pointRadius: 0
+                },
+                {
+                    label: 'Ideal Vacuum (Tsiolkovsky)',
+                    data: ideal_points,
+                    backgroundColor: '#728b9c',
+                    showLine: true,
+                    borderColor: '#728b9c',
+                    borderWidth: 1.5,
+                    borderDash: [5, 5],
+                    pointRadius: 0
+                }
+            ];
+            chartTraj.update();
+
+            // Update Dynamics Chart
+            chartDyn.data.labels = t_data;
+            chartDyn.data.datasets = [
+                {
+                    label: 'Thrust (N)',
+                    data: Array.from(res.T.slice(0, res.ptr)),
+                    borderColor: '#00f3ff',
+                    yAxisID: 'yT'
+                },
+                {
+                    label: 'Pressure (PSI)',
+                    data: Array.from(res.P.slice(0, res.ptr)),
+                    borderColor: '#39ff14',
+                    yAxisID: 'yP'
+                }
+            ];
+            // Zoom X-axis to burn time for dynamics
+            chartDyn.options.scales.x.max = res.burn_time * 1.5;
+            chartDyn.update();
+
+            // Update Kinematics Chart
+            chartKin.data.labels = t_data;
+            chartKin.data.datasets = [
+                {
+                    label: 'Altitude (m)',
+                    data: y_data,
+                    borderColor: '#00f3ff',
+                    yAxisID: 'yA'
+                },
+                {
+                    label: 'Velocity (m/s)',
+                    data: Array.from(res.v.slice(0, res.ptr)),
+                    borderColor: '#39ff14',
+                    yAxisID: 'yV'
+                }
+            ];
+            chartKin.options.scales.x.max = res.t[res.ptr-1];
+            chartKin.update();
+        }
+
+        function clearCharts() {
+            document.getElementById('val-range').innerText = '0.00 m';
+            document.getElementById('val-ideal-range').innerText = '0.00 m';
+            document.getElementById('val-apogee').innerText = '0.00 m';
+            document.getElementById('val-max-v').innerText = '0.00 m/s';
+            
+            chartTraj.data.datasets = []; chartTraj.update();
+            chartDyn.data.datasets = []; chartDyn.update();
+            chartKin.data.datasets = []; chartKin.update();
+        }
+
+        function optimizeRange() {
+            let btn = document.getElementById('btn-optimize');
+            btn.innerText = ">>> CALCULATING... <<<";
+            btn.style.backgroundColor = 'var(--green)';
+            btn.style.color = '#000';
+
+            setTimeout(() => {
+                let bestRange = 0;
+                let bestTheta = 45;
+                let bestWR = 35;
+                
+                let mode = document.getElementById('in-mode').value;
+                
+                // Grid Search
+                for(let th = 20; th <= 60; th += 1) {
+                    document.getElementById('in-angle').value = th;
+                    
+                    if (mode === "AIR") {
+                        for(let wr = 10; wr <= 60; wr += 2) {
+                            document.getElementById('in-water-ratio').value = wr;
+                            let res = runSimUI(true);
+                            if (res && res.range > bestRange) {
+                                bestRange = res.range;
+                                bestTheta = th;
+                                bestWR = wr;
+                            }
+                        }
+                    } else {
+                        let res = runSimUI(true);
+                        if (res && res.range > bestRange) {
+                            bestRange = res.range;
+                            bestTheta = th;
+                        }
+                    }
+                }
+
+                // Restore best and show
+                document.getElementById('in-angle').value = bestTheta;
+                if(mode === "AIR") document.getElementById('in-water-ratio').value = bestWR;
+                
+                runSimUI(false);
+                
+                btn.innerText = "> OPTIMIZE RANGE <";
+                btn.style.backgroundColor = 'transparent';
+                btn.style.color = 'var(--green)';
+                
+                setStatus(`OPTIMIZED: Angle ${bestTheta}°` + (mode==="AIR"? `, Water ${bestWR}%` : ``));
+            }, 100);
+        }
+
+        // Initialize
+        window.onload = () => {
+            initCharts();
+            runSimUI();
+        };
+
+    </script>
+</body>
+</html>
