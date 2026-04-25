@@ -1060,61 +1060,143 @@
 
         function optimizeRange() {
             let btn = document.getElementById('btn-optimize');
-            btn.innerText = ">>> CALCULATING... <<<";
-            btn.style.backgroundColor = 'var(--green)';
-            btn.style.color = '#000';
+            btn.innerText = ">>> RUNNING PSO SWARM... <<<";
+            btn.style.backgroundColor = 'var(--red)';
+            btn.style.color = '#fff';
 
             setTimeout(() => {
-                let bestRange = 0;
-                let bestTheta = 45;
-                let bestWR = 35;
-                
                 let mode = document.getElementById('in-mode').value;
                 
-                let bestVolVin = 600;
-                let bestMassSalt = 60;
-
-                // Grid Search
+                let bounds = {};
                 if (mode === "AIR") {
-                    for(let th = 20; th <= 60; th += 2) {
-                        document.getElementById('in-angle').value = th;
-                        for(let wr = 10; wr <= 60; wr += 2) {
-                            document.getElementById('in-water-ratio').value = wr;
-                            let res = runSimUI(true);
-                            if (res && res.range > bestRange) {
-                                bestRange = res.range;
-                                bestTheta = th;
-                                bestWR = wr;
+                    bounds = {
+                        'in-water-ratio': [5, 80],
+                        'in-d-nozzle': [5, 25],
+                        'in-l-tube': [0, 1.5],
+                        'in-d-tube': [5, 25],
+                        'in-d-body': [50, 150],
+                        'in-cd': [0.2, 0.8],
+                        'in-m-empty': [0.05, 0.5],
+                        'in-m-ballast': [0, 0.5],
+                        'in-angle': [10, 80]
+                    };
+                } else {
+                    bounds = {
+                        'in-vol-vinegar': [100, 2000],
+                        'in-popoff': [10, 150],
+                        'in-burst': [10, 200],
+                        'in-d-nozzle': [5, 25],
+                        'in-l-tube': [0, 1.5],
+                        'in-d-tube': [5, 25],
+                        'in-d-body': [50, 150],
+                        'in-cd': [0.2, 0.8],
+                        'in-m-empty': [0.05, 0.5],
+                        'in-m-ballast': [0, 0.5],
+                        'in-angle': [10, 80]
+                    };
+                }
+
+                // Save original values in case PSO fails
+                const originalValues = {};
+                for(let key in bounds) {
+                    originalValues[key] = parseFloat(document.getElementById(key).value);
+                }
+
+                const NUM_PARTICLES = 40;
+                const NUM_ITERATIONS = 40;
+                const keys = Object.keys(bounds);
+                const num_dims = keys.length;
+
+                let particles = [];
+                let globalBestPos = [];
+                let globalBestScore = -1;
+
+                // Initialize swarm
+                for(let i=0; i<NUM_PARTICLES; i++) {
+                    let pos = [];
+                    let vel = [];
+                    for(let j=0; j<num_dims; j++) {
+                        let min = bounds[keys[j]][0];
+                        let max = bounds[keys[j]][1];
+                        pos.push(min + Math.random() * (max - min));
+                        vel.push((Math.random() - 0.5) * (max - min) * 0.2);
+                    }
+                    particles.push({ pos: pos, vel: vel, bestPos: [...pos], bestScore: -1 });
+                }
+
+                const w = 0.7; // Inertia
+                const c1 = 1.5; // Cognitive
+                const c2 = 1.5; // Social
+
+                for(let iter=0; iter<NUM_ITERATIONS; iter++) {
+                    for(let i=0; i<NUM_PARTICLES; i++) {
+                        let p = particles[i];
+                        
+                        // Set DOM inputs
+                        for(let j=0; j<num_dims; j++) {
+                            // Constraint: Launch tube dia <= nozzle dia
+                            if (keys[j] === 'in-d-tube') {
+                                let nozzleIdx = keys.indexOf('in-d-nozzle');
+                                if (nozzleIdx !== -1 && p.pos[j] > p.pos[nozzleIdx]) p.pos[j] = p.pos[nozzleIdx];
                             }
+                            // Constraint: Burst limit > popoff limit
+                            if (keys[j] === 'in-burst') {
+                                let popIdx = keys.indexOf('in-popoff');
+                                if (popIdx !== -1 && p.pos[j] <= p.pos[popIdx]) p.pos[j] = p.pos[popIdx] + 5;
+                            }
+                            document.getElementById(keys[j]).value = p.pos[j];
+                        }
+                        
+                        let res = runSimUI(true);
+                        let score = (res) ? res.range : 0;
+                        
+                        if (score > p.bestScore) {
+                            p.bestScore = score;
+                            p.bestPos = [...p.pos];
+                        }
+                        if (score > globalBestScore) {
+                            globalBestScore = score;
+                            globalBestPos = [...p.pos];
                         }
                     }
-                } else {
-                    // Chemical Mode Optimization
-                    for(let th = 20; th <= 60; th += 2) {
-                        document.getElementById('in-angle').value = th;
-                        for(let vol = 200; vol <= 1200; vol += 100) {
-                            document.getElementById('in-vol-vinegar').value = vol;
-                            for(let mass = 10; mass <= 150; mass += 10) {
-                                document.getElementById('in-mass-salt').value = mass;
-                                let res = runSimUI(true);
-                                if (res && res.range > bestRange) {
-                                    bestRange = res.range;
-                                    bestTheta = th;
-                                    bestVolVin = vol;
-                                    bestMassSalt = mass;
-                                }
-                            }
+                    
+                    // Update kinematics
+                    for(let i=0; i<NUM_PARTICLES; i++) {
+                        let p = particles[i];
+                        for(let j=0; j<num_dims; j++) {
+                            let r1 = Math.random();
+                            let r2 = Math.random();
+                            p.vel[j] = w * p.vel[j] + c1 * r1 * (p.bestPos[j] - p.pos[j]) + c2 * r2 * (globalBestPos[j] - p.pos[j]);
+                            p.pos[j] += p.vel[j];
+                            
+                            // Bounds clamping
+                            let min = bounds[keys[j]][0];
+                            let max = bounds[keys[j]][1];
+                            if (p.pos[j] < min) { p.pos[j] = min; p.vel[j] *= -0.5; }
+                            if (p.pos[j] > max) { p.pos[j] = max; p.vel[j] *= -0.5; }
                         }
                     }
                 }
 
-                // Restore best and show
-                document.getElementById('in-angle').value = bestTheta;
-                if(mode === "AIR") {
-                    document.getElementById('in-water-ratio').value = bestWR;
+                // Restore best
+                if (globalBestScore > 0) {
+                    for(let j=0; j<num_dims; j++) {
+                        let val = globalBestPos[j];
+                        if (['in-water-ratio', 'in-angle', 'in-vol-vinegar', 'in-popoff', 'in-burst', 'in-d-body'].includes(keys[j])) {
+                            val = Math.round(val);
+                        } else if (keys[j] === 'in-l-tube') {
+                            val = val.toFixed(2);
+                        } else {
+                            val = val.toFixed(1);
+                        }
+                        document.getElementById(keys[j]).value = val;
+                    }
+                    setStatus(`PSO SUCCESS: Max Range ${globalBestScore.toFixed(2)}m found!`);
                 } else {
-                    document.getElementById('in-vol-vinegar').value = bestVolVin;
-                    document.getElementById('in-mass-salt').value = bestMassSalt;
+                    for(let key in originalValues) {
+                        document.getElementById(key).value = originalValues[key];
+                    }
+                    setStatus(`PSO FAILED: No valid non-exploding trajectory found.`, true);
                 }
                 
                 runSimUI(false);
@@ -1122,12 +1204,6 @@
                 btn.innerText = "> OPTIMIZE RANGE <";
                 btn.style.backgroundColor = 'transparent';
                 btn.style.color = 'var(--green)';
-                
-                if(mode === "AIR") {
-                    setStatus(`OPTIMIZED: Angle ${bestTheta}°, Water ${bestWR}%`);
-                } else {
-                    setStatus(`OPTIMIZED: Angle ${bestTheta}°, Vinegar ${bestVolVin}ml, Salt ${bestMassSalt}g`);
-                }
             }, 100);
         }
 
