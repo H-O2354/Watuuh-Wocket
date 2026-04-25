@@ -619,6 +619,11 @@
                             chart.pinnedElements.push({ datasetIndex, index });
                         }
                         chart.draw(); // force redraw
+                    } else {
+                        if (chart.pinnedElements && chart.pinnedElements.length > 0) {
+                            chart.pinnedElements = [];
+                            chart.draw();
+                        }
                     }
                 }
             },
@@ -643,6 +648,14 @@
                         }
                         
                         ctx.save();
+                        
+                        // Keep the pinned point visible
+                        ctx.beginPath();
+                        ctx.arc(point.x, point.y, 5, 0, 2 * Math.PI);
+                        ctx.fillStyle = dataset.borderColor || '#00f3ff';
+                        ctx.fill();
+                        
+                        // Tooltip box styling
                         ctx.fillStyle = 'rgba(10, 20, 32, 0.9)';
                         ctx.strokeStyle = dataset.borderColor || '#00f3ff';
                         ctx.lineWidth = 1;
