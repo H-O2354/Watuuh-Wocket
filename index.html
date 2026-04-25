@@ -1,4 +1,3 @@
-Gemma4-31B API Key: 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
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -927,15 +926,8 @@ Gemma4-31B API Key: sk-or-v1-b00847c253b2a5c0a829dd9467400f8f53b46d8a31edfa98068
     <!-- API Key Modal -->
     <div id="api-modal" class="api-modal active">
         <div class="api-modal-box">
-            <h2>🔑 AI Optimizer API Key</h2>
-            <div style="margin-bottom:15px;">
-                <label style="color:var(--cyan); font-size:12px; display:block; margin-bottom:6px;">PROVIDER</label>
-                <select id="api-provider" style="width:100%; background:#000; color:var(--green); border:1px solid var(--border-color); padding:10px; font-family:var(--font-mono); font-size:13px;" onchange="updateProviderUI()">
-                    <option value="openrouter">OpenRouter (Recommended — Free)</option>
-                    <option value="google">Google AI Studio</option>
-                </select>
-            </div>
-            <p id="api-help-text">
+            <h2>🔑 OpenRouter API Key</h2>
+            <p>
                 Nhập API key từ <a href="https://openrouter.ai/keys" target="_blank" style="color:var(--cyan);">OpenRouter</a> để sử dụng <strong style="color:var(--green);">Gemma 4 31B</strong> làm AI Optimizer (miễn phí).<br>
                 Key chỉ lưu trong phiên làm việc hiện tại, không được lưu trữ vĩnh viễn.
             </p>
@@ -1682,22 +1674,7 @@ Gemma4-31B API Key: sk-or-v1-b00847c253b2a5c0a829dd9467400f8f53b46d8a31edfa98068
 
         // --- API KEY MANAGEMENT ---
         let _gemmaApiKey = null;
-        let _apiProvider = 'openrouter'; // 'openrouter' or 'google'
         let _thinkingEnabled = true;
-        let _corsProxy = ''; // Set automatically if direct call fails
-
-        function updateProviderUI() {
-            const provider = document.getElementById('api-provider').value;
-            const helpText = document.getElementById('api-help-text');
-            const input = document.getElementById('api-key-input');
-            if (provider === 'openrouter') {
-                helpText.innerHTML = 'Nhập API key từ <a href="https://openrouter.ai/keys" target="_blank" style="color:var(--cyan);">OpenRouter</a> để sử dụng <strong style="color:var(--green);">Gemma 4 31B</strong> làm AI Optimizer (miễn phí).<br>Key chỉ lưu trong phiên làm việc hiện tại, không được lưu trữ vĩnh viễn.';
-                input.placeholder = 'sk-or-v1-...';
-            } else {
-                helpText.innerHTML = 'Nhập API key từ <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--cyan);">Google AI Studio</a> để sử dụng <strong style="color:var(--green);">Gemma 4 31B</strong> làm AI Optimizer.<br>Key chỉ lưu trong phiên làm việc hiện tại, không được lưu trữ vĩnh viễn.';
-                input.placeholder = 'AIzaSy...';
-            }
-        }
 
         function showApiModal() {
             document.getElementById('api-modal').classList.add('active');
@@ -1711,77 +1688,61 @@ Gemma4-31B API Key: sk-or-v1-b00847c253b2a5c0a829dd9467400f8f53b46d8a31edfa98068
         async function connectApiKey() {
             const input = document.getElementById('api-key-input');
             const errEl = document.getElementById('api-key-error');
-            const provider = document.getElementById('api-provider').value;
             const key = input.value.trim();
             if (!key) { errEl.innerText = 'Vui lòng nhập API key.'; return; }
             errEl.innerText = 'Đang kiểm tra kết nối...';
             errEl.style.color = 'var(--cyan)';
 
-            // Helper to build request options
-            function buildTestReq(proxyPrefix) {
-                if (provider === 'openrouter') {
-                    return {
-                        url: proxyPrefix + 'https://openrouter.ai/api/v1/chat/completions',
-                        opts: {
-                            method: 'POST',
-                            headers: {'Content-Type':'application/json','Authorization':'Bearer '+key,'HTTP-Referer':location.href,'X-Title':'Water Rocket Optimizer'},
-                            body: JSON.stringify({model:'google/gemma-4-31b-it:free', messages:[{role:'user',content:'Say OK'}], max_tokens:50})
-                        }
-                    };
-                } else {
-                    return {
-                        url: proxyPrefix + `https://generativelanguage.googleapis.com/v1beta/models/gemma-4-31b-it:generateContent?key=${key}`,
-                        opts: {
-                            method: 'POST',
-                            headers: {'Content-Type':'application/json'},
-                            body: JSON.stringify({contents:[{parts:[{text:'Say OK'}]}],generationConfig:{maxOutputTokens:50}})
-                        }
-                    };
-                }
-            }
-
             try {
-                // Try 1: Direct call
-                _corsProxy = '';
-                let req = buildTestReq('');
-                let r;
-                try {
-                    r = await fetch(req.url, req.opts);
-                } catch(networkErr) {
-                    // Network error = likely CORS. Try with proxy.
-                    errEl.innerText = 'CORS bị chặn, thử kết nối qua proxy...';
-                    _corsProxy = 'https://corsproxy.io/?url=';
-                    req = buildTestReq(_corsProxy);
-                    r = await fetch(req.url, req.opts);
+                const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + key
+                    },
+                    body: JSON.stringify({
+                        model: 'google/gemma-4-31b-it:free',
+                        messages: [{role: 'user', content: 'Say OK'}]
+                    })
+                });
+
+                const responseText = await r.text();
+                console.log('[API Test] Status:', r.status, 'Response:', responseText);
+
+                let data;
+                try { data = JSON.parse(responseText); } catch(parseErr) {
+                    throw new Error('Response không phải JSON. Status: ' + r.status);
                 }
 
+                if (data.error) {
+                    throw new Error(data.error.message || JSON.stringify(data.error));
+                }
                 if (!r.ok) {
-                    let errData;
-                    try { errData = await r.json(); } catch(_) { errData = {}; }
-                    let msg = errData.error?.message || r.statusText || `HTTP ${r.status}`;
-                    throw new Error(msg);
+                    throw new Error(`HTTP ${r.status}: ${r.statusText}`);
                 }
 
+                // Success!
                 _gemmaApiKey = key;
-                _apiProvider = provider;
                 _thinkingEnabled = document.getElementById('api-thinking').checked;
                 errEl.innerText = '';
                 errEl.style.color = 'var(--red)';
                 document.getElementById('api-modal').classList.remove('active');
                 document.getElementById('conn-dot').classList.add('connected');
-                let label = provider === 'openrouter' ? 'Gemma 4 (OpenRouter)' : 'Gemma 4 (Google)';
+                let label = 'Gemma 4 31B';
                 if (_thinkingEnabled) label += ' 🧠';
-                if (_corsProxy) label += ' [proxy]';
                 document.getElementById('conn-label').innerText = 'AI: ' + label;
             } catch(e) {
                 errEl.style.color = 'var(--red)';
+                console.error('[API Test] Error:', e);
                 let hint = '';
-                if (e.message.includes('Failed to fetch') || e.message.includes('NetworkError') || e.message.includes('CORS')) {
-                    hint = '\n→ Lỗi CORS: Browser không cho gọi API trực tiếp. Thử deploy lên GitHub Pages hoặc dùng provider khác.';
-                } else if (e.message.includes('API key') || e.message.includes('401') || e.message.includes('403')) {
-                    hint = '\n→ API key không hợp lệ hoặc hết hạn. Kiểm tra lại key.';
+                if (e.message.includes('Failed to fetch') || e.name === 'TypeError') {
+                    hint = '\n→ Lỗi mạng/CORS. Mở Console (F12) để xem chi tiết.';
+                } else if (e.message.includes('401') || e.message.includes('403')) {
+                    hint = '\n→ API key không hợp lệ. Tạo key mới tại openrouter.ai/keys';
                 } else if (e.message.includes('429') || e.message.includes('rate')) {
-                    hint = '\n→ Rate limit: Quá nhiều request. Đợi 1 phút rồi thử lại.';
+                    hint = '\n→ Rate limit. Đợi 1-2 phút rồi thử lại.';
+                } else if (e.message.includes('Provider returned error')) {
+                    hint = '\n→ Model tạm thời quá tải (free tier). Đợi 30s rồi thử lại.';
                 }
                 errEl.innerText = 'Lỗi: ' + e.message + hint;
             }
@@ -1910,55 +1871,30 @@ Respond with ONLY a valid JSON object. No markdown, no explanation outside JSON.
         }
 
         async function callGemma(prompt) {
-            let r, data, text;
-            if (_apiProvider === 'openrouter') {
-                let body = {
-                    model:'google/gemma-4-31b-it:free',
-                    messages:[{role:'user',content:prompt}],
-                    temperature:0.7,
-                    max_tokens: _thinkingEnabled ? 32768 : 4096,
-                    response_format:{type:'json_object'}
-                };
-                if (_thinkingEnabled) {
-                    body.reasoning = { effort: 'high' };
-                }
-                r = await fetch(_corsProxy + 'https://openrouter.ai/api/v1/chat/completions', {
-                    method:'POST',
-                    headers:{'Content-Type':'application/json','Authorization':'Bearer '+_gemmaApiKey,'HTTP-Referer':location.href,'X-Title':'Water Rocket Optimizer'},
-                    body: JSON.stringify(body)
-                });
-                if (!r.ok) {
-                    let e; try { e = await r.json(); } catch(_) { e = {}; }
-                    throw new Error(e.error?.message || `OpenRouter HTTP ${r.status}`);
-                }
-                data = await r.json();
-                text = data.choices?.[0]?.message?.content || '';
-            } else {
-                let genConfig = {responseMimeType:"application/json",temperature:0.7,maxOutputTokens:4096};
-                let bodyObj = {
-                    contents:[{parts:[{text:prompt}]}],
-                    generationConfig: genConfig
-                };
-                if (_thinkingEnabled) {
-                    bodyObj.generationConfig.maxOutputTokens = 32768;
-                    bodyObj.generationConfig.thinkingConfig = { thinkingBudget: 24000 };
-                }
-                r = await fetch(_corsProxy + `https://generativelanguage.googleapis.com/v1beta/models/gemma-4-31b-it:generateContent?key=${_gemmaApiKey}`, {
-                    method:'POST', headers:{'Content-Type':'application/json'},
-                    body: JSON.stringify(bodyObj)
-                });
-                if (!r.ok) {
-                    let e; try { e = await r.json(); } catch(_) { e = {}; }
-                    throw new Error(e.error?.message || `Google API HTTP ${r.status}`);
-                }
-                data = await r.json();
-                // With thinking, the response may have multiple parts — get the last text part
-                let parts = data.candidates?.[0]?.content?.parts || [];
-                text = '';
-                for (let p of parts) {
-                    if (p.text) text = p.text;
-                }
+            let body = {
+                model: 'google/gemma-4-31b-it:free',
+                messages: [{role: 'user', content: prompt}]
+            };
+            if (_thinkingEnabled) {
+                body.reasoning = { enabled: true };
             }
+
+            const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + _gemmaApiKey
+                },
+                body: JSON.stringify(body)
+            });
+
+            const rawText = await r.text();
+            console.log('[AI Round] Response:', rawText.substring(0, 500));
+            const data = JSON.parse(rawText);
+            if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+            if (!r.ok) throw new Error(`OpenRouter HTTP ${r.status}`);
+
+            let text = data.choices?.[0]?.message?.content || '';
             // Clean potential markdown fences from response
             text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
             return JSON.parse(text);
