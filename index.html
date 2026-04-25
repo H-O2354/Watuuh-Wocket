@@ -1,4 +1,4 @@
-###Gemma-4-31B(OpenRouter) Key: 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
+Gemma4-31B API Key: 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
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1725,7 +1725,7 @@
                         opts: {
                             method: 'POST',
                             headers: {'Content-Type':'application/json','Authorization':'Bearer '+key,'HTTP-Referer':location.href,'X-Title':'Water Rocket Optimizer'},
-                            body: JSON.stringify({model:'google/gemma-4-31b-it:free', messages:[{role:'user',content:'Reply with OK'}], max_tokens:5})
+                            body: JSON.stringify({model:'google/gemma-4-31b-it:free', messages:[{role:'user',content:'Say OK'}], max_tokens:50})
                         }
                     };
                 } else {
@@ -1734,7 +1734,7 @@
                         opts: {
                             method: 'POST',
                             headers: {'Content-Type':'application/json'},
-                            body: JSON.stringify({contents:[{parts:[{text:'Reply with OK'}]}],generationConfig:{maxOutputTokens:5}})
+                            body: JSON.stringify({contents:[{parts:[{text:'Say OK'}]}],generationConfig:{maxOutputTokens:50}})
                         }
                     };
                 }
@@ -1916,7 +1916,7 @@ Respond with ONLY a valid JSON object. No markdown, no explanation outside JSON.
                     model:'google/gemma-4-31b-it:free',
                     messages:[{role:'user',content:prompt}],
                     temperature:0.7,
-                    max_tokens: _thinkingEnabled ? 16000 : 1024,
+                    max_tokens: _thinkingEnabled ? 32768 : 4096,
                     response_format:{type:'json_object'}
                 };
                 if (_thinkingEnabled) {
@@ -1934,14 +1934,14 @@ Respond with ONLY a valid JSON object. No markdown, no explanation outside JSON.
                 data = await r.json();
                 text = data.choices?.[0]?.message?.content || '';
             } else {
-                let genConfig = {responseMimeType:"application/json",temperature:0.7,maxOutputTokens:1024};
+                let genConfig = {responseMimeType:"application/json",temperature:0.7,maxOutputTokens:4096};
                 let bodyObj = {
                     contents:[{parts:[{text:prompt}]}],
                     generationConfig: genConfig
                 };
                 if (_thinkingEnabled) {
-                    bodyObj.generationConfig.maxOutputTokens = 16000;
-                    bodyObj.generationConfig.thinkingConfig = { thinkingBudget: 8000 };
+                    bodyObj.generationConfig.maxOutputTokens = 32768;
+                    bodyObj.generationConfig.thinkingConfig = { thinkingBudget: 24000 };
                 }
                 r = await fetch(_corsProxy + `https://generativelanguage.googleapis.com/v1beta/models/gemma-4-31b-it:generateContent?key=${_gemmaApiKey}`, {
                     method:'POST', headers:{'Content-Type':'application/json'},
