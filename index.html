@@ -12,7 +12,12 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <!-- MathJax for rendering equations -->
-    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script>
+      window.MathJax = {
+        tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+        startup: { pageReady: () => { return MathJax.startup.defaultPageReady(); } }
+      };
+    </script>
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 
     <style>
@@ -306,6 +311,27 @@
         .math-section { margin-bottom: 25px; border-left: 3px solid var(--cyan); padding-left: 15px; }
         .math-section h3 { color: var(--green); font-size: 16px; margin-bottom: 10px; }
 
+        /* Tooltip styling */
+        .help-tip {
+            display: inline-block;
+            margin-left: 6px;
+            color: var(--bg-color);
+            background-color: var(--cyan);
+            border-radius: 50%;
+            width: 14px;
+            height: 14px;
+            text-align: center;
+            line-height: 14px;
+            font-size: 10px;
+            font-weight: bold;
+            cursor: help;
+            transition: all 0.2s;
+        }
+        .help-tip:hover {
+            box-shadow: 0 0 8px var(--cyan);
+            transform: scale(1.1);
+        }
+
     </style>
 </head>
 <body>
@@ -330,15 +356,15 @@
             <fieldset class="control-group">
                 <legend>Energy & Propellant</legend>
                 <div class="input-row">
-                    <label>Bottle Volume (L)</label>
+                    <label>Bottle Volume (L)<span class="help-tip" title="Thể tích chai (Lít)">?</span></label>
                     <input type="number" id="in-v-bottle" value="2.0" step="0.1" onchange="runSimUI()">
                 </div>
                 <div class="input-row" id="row-water-ratio">
-                    <label>Water Ratio (%)</label>
+                    <label>Water Ratio (%)<span class="help-tip" title="Tỉ lệ nước (%)">?</span></label>
                     <input type="number" id="in-water-ratio" value="35" step="1" onchange="runSimUI()">
                 </div>
                 <div class="input-row" id="row-air-pressure">
-                    <label>Initial Pressure (PSI)</label>
+                    <label>Initial Pressure (PSI)<span class="help-tip" title="Áp suất ban đầu (PSI)">?</span></label>
                     <input type="number" id="in-pressure" value="80" step="5" onchange="runSimUI()">
                 </div>
             </fieldset>
@@ -346,30 +372,30 @@
             <fieldset class="control-group hidden" id="group-chem">
                 <legend>Chemical Reaction parameters</legend>
                 <div class="input-row">
-                    <label>Carbonate Salt</label>
+                    <label>Carbonate Salt<span class="help-tip" title="Loại Muối (Baking Soda / Washing Soda)">?</span></label>
                     <select id="in-salt-type" onchange="runSimUI()" style="width: 140px;">
                         <option value="84">Baking Soda</option>
                         <option value="106">Washing Soda</option>
                     </select>
                 </div>
                 <div class="input-row">
-                    <label>Mass of Salt (g)</label>
+                    <label>Mass of Salt (g)<span class="help-tip" title="Khối lượng bột muối (g)">?</span></label>
                     <input type="number" id="in-mass-salt" value="60" step="5" onchange="runSimUI()">
                 </div>
                 <div class="input-row">
-                    <label>Vinegar Volume (ml)</label>
+                    <label>Vinegar Volume (ml)<span class="help-tip" title="Thể tích giấm (ml)">?</span></label>
                     <input type="number" id="in-vol-vinegar" value="600" step="50" onchange="runSimUI()">
                 </div>
                 <div class="input-row">
-                    <label>Acid Conc. % (m/v)</label>
+                    <label>Acid Conc. % (m/v)<span class="help-tip" title="Nồng độ axit của giấm (%)">?</span></label>
                     <input type="number" id="in-acid-conc" value="5" step="1" onchange="runSimUI()">
                 </div>
                 <div class="input-row">
-                    <label>Pop-off Pressure (PSI)</label>
+                    <label>Pop-off Pressure (PSI)<span class="help-tip" title="Áp suất bung nắp đậy bệ phóng (PSI)">?</span></label>
                     <input type="number" id="in-popoff" value="60" step="5" onchange="runSimUI()">
                 </div>
                 <div class="input-row">
-                    <label>Burst Limit (PSI)</label>
+                    <label>Burst Limit (PSI)<span class="help-tip" title="Áp suất giới hạn nổ chai (PSI)">?</span></label>
                     <input type="number" id="in-burst" value="150" step="5" onchange="runSimUI()" style="color:var(--red);">
                 </div>
             </fieldset>
@@ -377,15 +403,15 @@
             <fieldset class="control-group">
                 <legend>Thrust System</legend>
                 <div class="input-row">
-                    <label>Nozzle Dia. (mm)</label>
+                    <label>Nozzle Dia. (mm)<span class="help-tip" title="Đường kính vòi phun (mm)">?</span></label>
                     <input type="number" id="in-d-nozzle" value="21" step="0.5" onchange="runSimUI()">
                 </div>
                 <div class="input-row">
-                    <label>Launch Tube Len. (m)</label>
+                    <label>Launch Tube Len. (m)<span class="help-tip" title="Chiều dài ống dẫn phóng (m)">?</span></label>
                     <input type="number" id="in-l-tube" value="0.3" step="0.05" onchange="runSimUI()">
                 </div>
                 <div class="input-row">
-                    <label>Launch Tube Dia. (mm)</label>
+                    <label>Launch Tube Dia. (mm)<span class="help-tip" title="Đường kính ngoài ống dẫn (mm)">?</span></label>
                     <input type="number" id="in-d-tube" value="21" step="0.5" onchange="runSimUI()">
                 </div>
             </fieldset>
@@ -393,19 +419,19 @@
             <fieldset class="control-group">
                 <legend>Aerodynamics & Mass</legend>
                 <div class="input-row">
-                    <label>Body Dia. (mm)</label>
+                    <label>Body Dia. (mm)<span class="help-tip" title="Đường kính thân chai (mm)">?</span></label>
                     <input type="number" id="in-d-body" value="100" step="5" onchange="runSimUI()">
                 </div>
                 <div class="input-row">
-                    <label>Drag Coeff. (Cd)</label>
+                    <label>Drag Coeff. (Cd)<span class="help-tip" title="Hệ số cản khí động học">?</span></label>
                     <input type="number" id="in-cd" value="0.35" step="0.01" onchange="runSimUI()">
                 </div>
                 <div class="input-row">
-                    <label>Empty Mass (kg)</label>
+                    <label>Empty Mass (kg)<span class="help-tip" title="Khối lượng vỏ rỗng (kg)">?</span></label>
                     <input type="number" id="in-m-empty" value="0.10" step="0.01" onchange="runSimUI()">
                 </div>
                 <div class="input-row">
-                    <label>Nose Ballast (kg)</label>
+                    <label>Nose Ballast (kg)<span class="help-tip" title="Khối lượng đối trọng ở mũi (kg)">?</span></label>
                     <input type="number" id="in-m-ballast" value="0.05" step="0.01" onchange="runSimUI()">
                 </div>
             </fieldset>
@@ -413,15 +439,15 @@
             <fieldset class="control-group">
                 <legend>Trajectory & Environment</legend>
                 <div class="input-row">
-                    <label>Launch Angle (deg)</label>
+                    <label>Launch Angle (deg)<span class="help-tip" title="Góc nghiêng bệ phóng (Độ)">?</span></label>
                     <input type="number" id="in-angle" value="45" step="1" onchange="runSimUI()">
                 </div>
                 <div class="input-row">
-                    <label>Air Temp (C)</label>
+                    <label>Air Temp (C)<span class="help-tip" title="Nhiệt độ không khí (Độ C)">?</span></label>
                     <input type="number" id="in-temp" value="15" step="1" onchange="runSimUI()">
                 </div>
                 <div class="input-row">
-                    <label>Environment</label>
+                    <label>Environment<span class="help-tip" title="Môi trường (Độ cao so với mực nước biển)">?</span></label>
                     <select id="in-env" onchange="runSimUI()" style="width: 140px;">
                         <option value="1.225">Sea Level (0m)</option>
                         <option value="1.056">Ta Xua (1500m)</option>
@@ -933,6 +959,12 @@
                 if(yi >= 0) ideal_points.push({x: xi, y: yi});
             }
 
+            let apogee_point = {x: 0, y: 0};
+            for(let p of traj_points) {
+                if (p.y > apogee_point.y) apogee_point = p;
+            }
+            let touchdown_point = traj_points[traj_points.length - 1] || {x:0, y:0};
+
             // Update Trajectory Chart
             chartTraj.data.datasets = [
                 {
@@ -953,6 +985,24 @@
                     borderWidth: 1.5,
                     borderDash: [5, 5],
                     pointRadius: 0
+                },
+                {
+                    label: 'Apogee (Điểm cao nhất)',
+                    data: [apogee_point],
+                    backgroundColor: '#ff003c',
+                    borderColor: '#ff003c',
+                    pointRadius: 6,
+                    pointStyle: 'triangle',
+                    showLine: false
+                },
+                {
+                    label: 'Touchdown (Đáp đất)',
+                    data: [touchdown_point],
+                    backgroundColor: '#39ff14',
+                    borderColor: '#39ff14',
+                    pointRadius: 6,
+                    pointStyle: 'crossRot',
+                    showLine: false
                 }
             ];
             chartTraj.update();
