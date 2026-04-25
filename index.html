@@ -821,11 +821,7 @@
                 P_init_Pa = parseFloat(document.getElementById('in-pressure').value) * 6894.76 + P_atm;
             } else {
                 let vol_vin = parseFloat(document.getElementById('in-vol-vinegar').value); // ml
-                V_liquid = vol_vin / 1000000; // m3
                 
-                // Update ratio UI
-                document.getElementById('in-water-ratio').value = ((V_liquid / V_bottle)*100).toFixed(1);
-
                 let acid_conc = parseFloat(document.getElementById('in-acid-conc').value);
                 let mass_acid = vol_vin * (acid_conc / 100);
                 let mol_acid = mass_acid / 60.05;
@@ -836,6 +832,17 @@
 
                 let mol_co2 = (salt_type === 84) ? Math.min(mol_acid, mol_salt) : Math.min(mol_acid/2, mol_salt);
                 
+                // Add generated water to the liquid volume
+                // 1 mole of CO2 produced means 1 mole of H2O produced (18.015 g)
+                let mass_water_gen = mol_co2 * 18.015;
+                let vol_water_gen = mass_water_gen / 1000; // ml
+                
+                let total_liquid_ml = vol_vin + vol_water_gen;
+                V_liquid = total_liquid_ml / 1000000; // m3
+
+                // Update ratio UI
+                document.getElementById('in-water-ratio').value = ((V_liquid / V_bottle)*100).toFixed(1);
+
                 let V_air = V_bottle - V_liquid;
                 let P_calc = (mol_co2 * 8.314 * params.T_env) / V_air + P_atm;
                 let P_calc_PSI = (P_calc - P_atm) / 6894.76;
@@ -854,7 +861,14 @@
                     status = `SUCCESS: POPS OFF AT ${p_pop} PSI`;
                 }
                 
-                rho_fluid = ((vol_vin * 1.0) + mass_salt) / vol_vin * 1000;
+                // Density of the resulting mixture
+                // Assuming mass of remaining salt, sodium acetate, water, etc.
+                let total_mass_fluid = (vol_vin * 1.0) + mass_salt; 
+                // Subtract the mass of CO2 that leaves the liquid phase
+                let mass_co2 = mol_co2 * 44.01;
+                total_mass_fluid -= mass_co2;
+                
+                rho_fluid = total_mass_fluid / total_liquid_ml * 1000;
             }
 
             params.m_water_init = V_liquid * rho_fluid;
@@ -1007,11 +1021,13 @@
                 
                 let mode = document.getElementById('in-mode').value;
                 
+                let bestVolVin = 600;
+                let bestMassSalt = 60;
+
                 // Grid Search
-                for(let th = 20; th <= 60; th += 1) {
-                    document.getElementById('in-angle').value = th;
-                    
-                    if (mode === "AIR") {
+                if (mode === "AIR") {
+                    for(let th = 20; th <= 60; th += 2) {
+                        document.getElementById('in-angle').value = th;
                         for(let wr = 10; wr <= 60; wr += 2) {
                             document.getElementById('in-water-ratio').value = wr;
                             let res = runSimUI(true);
@@ -1021,18 +1037,35 @@
                                 bestWR = wr;
                             }
                         }
-                    } else {
-                        let res = runSimUI(true);
-                        if (res && res.range > bestRange) {
-                            bestRange = res.range;
-                            bestTheta = th;
+                    }
+                } else {
+                    // Chemical Mode Optimization
+                    for(let th = 20; th <= 60; th += 2) {
+                        document.getElementById('in-angle').value = th;
+                        for(let vol = 200; vol <= 1200; vol += 100) {
+                            document.getElementById('in-vol-vinegar').value = vol;
+                            for(let mass = 10; mass <= 150; mass += 10) {
+                                document.getElementById('in-mass-salt').value = mass;
+                                let res = runSimUI(true);
+                                if (res && res.range > bestRange) {
+                                    bestRange = res.range;
+                                    bestTheta = th;
+                                    bestVolVin = vol;
+                                    bestMassSalt = mass;
+                                }
+                            }
                         }
                     }
                 }
 
                 // Restore best and show
                 document.getElementById('in-angle').value = bestTheta;
-                if(mode === "AIR") document.getElementById('in-water-ratio').value = bestWR;
+                if(mode === "AIR") {
+                    document.getElementById('in-water-ratio').value = bestWR;
+                } else {
+                    document.getElementById('in-vol-vinegar').value = bestVolVin;
+                    document.getElementById('in-mass-salt').value = bestMassSalt;
+                }
                 
                 runSimUI(false);
                 
@@ -1040,7 +1073,11 @@
                 btn.style.backgroundColor = 'transparent';
                 btn.style.color = 'var(--green)';
                 
-                setStatus(`OPTIMIZED: Angle ${bestTheta}°` + (mode==="AIR"? `, Water ${bestWR}%` : ``));
+                if(mode === "AIR") {
+                    setStatus(`OPTIMIZED: Angle ${bestTheta}°, Water ${bestWR}%`);
+                } else {
+                    setStatus(`OPTIMIZED: Angle ${bestTheta}°, Vinegar ${bestVolVin}ml, Salt ${bestMassSalt}g`);
+                }
             }, 100);
         }
 
