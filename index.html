@@ -557,7 +557,10 @@
 
             <div class="math-section">
                 <h3>6. Tsiolkovsky Ideal Vacuum Range</h3>
-                <p>$$ v_0 = v_{e} \ln\left(1 + \frac{m_{liquid}}{m_{dry}}\right) \implies R_{max} = \frac{v_0^2 \sin(2\theta)}{g} $$</p>
+                <p>Because pressure drops as water is expelled, we use the average exhaust velocity $\bar{v}_e$ derived from adiabatic expansion work $W$:</p>
+                <p>$$ W = \frac{P_i V_i}{\gamma - 1} \left[ 1 - \left(\frac{V_i}{V_f}\right)^{\gamma - 1} \right] - P_{atm}(V_f - V_i) \implies \bar{v}_e = \sqrt{\frac{2W}{m_{liquid}}} $$</p>
+                <p>$$ v_0 = \bar{v}_e \ln\left(1 + \frac{m_{liquid}}{m_{dry}}\right) \implies R_{max} = \frac{v_0^2 \sin(2\theta)}{g} $$</p>
+                <p><em>* Chemical mode applies a 0.4x penalty to $\bar{v}_e$ due to foam (two-phase flow) choking.</em></p>
             </div>
 
         </div>
@@ -775,11 +778,13 @@
                     if (dist < params.L_tube) {
                         // Tube phase: works like a piston
                         Thrust = P_eff * params.A_tube;
+                        if (params.is_chem) Thrust *= 0.5; // Foam compressability loss
                         dV_air_dt = params.A_tube * v_mag;
                         dm_dt = 0;
                     } else {
                         // Water thrust phase
                         let ve = Math.sqrt(2 * P_eff / params.rho_fluid);
+                        if (params.is_chem) ve *= 0.4; // Foam choking (two-phase flow) limits exhaust velocity
                         let mdot = params.rho_fluid * params.A_e * ve;
                         Thrust = mdot * ve;
                         dV_air_dt = params.A_e * ve;
@@ -928,6 +933,10 @@
                 P_atm: P_atm
             };
 
+            // Constrain launch tube length realistically (cannot be longer than bottle's cylindrical section)
+            let max_tube = V_bottle / params.A_ref;
+            params.L_tube = Math.min(params.L_tube, max_tube * 0.8);
+
             let V_liquid, rho_fluid, P_init_Pa;
             let exploded = false;
             let status = "NOMINAL";
@@ -953,7 +962,7 @@
                 // Add generated water to the liquid volume
                 // 1 mole of CO2 produced means 1 mole of H2O produced (18.015 g)
                 let mass_water_gen = mol_co2 * 18.015;
-                let vol_water_gen = mass_water_gen / 1000; // ml
+                let vol_water_gen = mass_water_gen; // density is 1g/ml, so grams = ml
                 
                 let total_liquid_ml = vol_vin + vol_water_gen;
                 V_liquid = total_liquid_ml / 1000000; // m3
@@ -962,21 +971,31 @@
                 document.getElementById('in-water-ratio').value = ((V_liquid / V_bottle)*100).toFixed(1);
 
                 let V_air = V_bottle - V_liquid;
-                let P_calc = (mol_co2 * 8.314 * params.T_env) / V_air + P_atm;
-                let P_calc_PSI = (P_calc - P_atm) / 6894.76;
-
+                
                 let p_pop = parseFloat(document.getElementById('in-popoff').value);
                 let p_burst = parseFloat(document.getElementById('in-burst').value);
 
-                if (P_calc_PSI > p_burst) {
+                if (V_air <= 0) {
                     exploded = true;
-                    status = `BURST WARNING: > ${p_burst} PSI`;
-                } else if (P_calc_PSI < p_pop) {
-                    exploded = true;
-                    status = `FAILURE: REACHED ONLY ${P_calc_PSI.toFixed(1)} PSI (POPOFF: ${p_pop})`;
+                    status = `BURST WARNING: LIQUID OVERFLOW! V_AIR <= 0`;
                 } else {
-                    P_init_Pa = p_pop * 6894.76 + P_atm;
-                    status = `SUCCESS: POPS OFF AT ${p_pop} PSI`;
+                    let P_calc = (mol_co2 * 8.314 * params.T_env) / V_air + P_atm;
+                    let P_calc_PSI = (P_calc - P_atm) / 6894.76;
+                    
+                    if (p_pop >= p_burst) {
+                        exploded = true;
+                        status = `BURST WARNING: POPOFF >= BURST LIMIT`;
+                    } else if (P_calc_PSI >= p_burst && p_pop > p_burst) {
+                        exploded = true;
+                        status = `BURST WARNING: > ${p_burst} PSI`;
+                    } else if (P_calc_PSI < p_pop) {
+                        exploded = true;
+                        status = `FAILURE: REACHED ONLY ${P_calc_PSI.toFixed(1)} PSI (POPOFF: ${p_pop})`;
+                    } else {
+                        // Successful pop-off at p_pop
+                        P_init_Pa = p_pop * 6894.76 + P_atm;
+                        status = `SUCCESS: POPS OFF AT ${p_pop} PSI`;
+                    }
                 }
                 
                 // Density of the resulting mixture
@@ -994,6 +1013,8 @@
             params.rho_fluid = rho_fluid;
             params.exploded = exploded;
             params.status = status;
+            params.is_chem = (mode === "CHEM");
+            params.V_liquid = V_liquid;
 
             return params;
         }
@@ -1010,10 +1031,25 @@
 
             const res = Engine.simulate(params);
 
-            // Calculate Tsiolkovsky Ideal trajectory
-            let u_eq = Math.sqrt(2 * (params.P_init - P_atm) / params.rho_fluid);
-            let v0_ideal = u_eq * Math.log(1 + params.m_water_init / params.m_dry);
-            let ideal_range = (v0_ideal * v0_ideal * Math.sin(2 * params.theta0)) / g;
+            // Calculate Tsiolkovsky Ideal trajectory with Average Exhaust Velocity
+            let V_air_i = params.V_bottle - params.V_liquid;
+            let V_air_f = params.V_bottle;
+            let P_i = params.P_init;
+            let ideal_range = 0;
+            let v0_ideal = 0;
+            
+            if (V_air_i > 0 && params.m_water_init > 0) {
+                // Total work done by expanding gas
+                let W = (P_i * V_air_i) / (gamma - 1) * (1 - Math.pow(V_air_i / V_air_f, gamma - 1)) - P_atm * (V_air_f - V_air_i);
+                if (W < 0) W = 0;
+                
+                // Average exhaust velocity (energy equivalence)
+                let ve_avg = Math.sqrt(2 * W / params.m_water_init);
+                if (params.is_chem) ve_avg *= 0.4; // Apply chemical penalty
+                
+                v0_ideal = ve_avg * Math.log(1 + params.m_water_init / params.m_dry);
+                ideal_range = (v0_ideal * v0_ideal * Math.sin(2 * params.theta0)) / g;
+            }
 
             if (!silent) {
                 updateUI(res, ideal_range, v0_ideal, params);
