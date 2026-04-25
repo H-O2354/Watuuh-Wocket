@@ -1996,10 +1996,10 @@ Respond with ONLY a valid JSON object. No markdown, no explanation outside JSON.
 }`;
         }
 
-        async function callGemma(prompt) {
+        async function callGemma(messages) {
             let body = {
                 model: 'google/gemma-4-31b-it:free',
-                messages: [{ role: 'user', content: prompt }]
+                messages: messages
             };
             if (_thinkingEnabled) {
                 body.reasoning = { enabled: true };
@@ -2020,10 +2020,18 @@ Respond with ONLY a valid JSON object. No markdown, no explanation outside JSON.
             if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
             if (!r.ok) throw new Error(`OpenRouter HTTP ${r.status}`);
 
-            let text = data.choices?.[0]?.message?.content || '';
+            const choice = data.choices?.[0]?.message;
+            if (!choice) throw new Error('No message returned from API');
+
+            let text = choice.content || '';
             // Clean potential markdown fences from response
             text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-            return JSON.parse(text);
+
+            return {
+                content: text,
+                reasoning_details: choice.reasoning_details,
+                parsed: JSON.parse(text)
+            };
         }
 
         async function aiOptimize() {
@@ -2050,7 +2058,8 @@ Respond with ONLY a valid JSON object. No markdown, no explanation outside JSON.
             progFill.style.width = '0%';
 
             const MAX_ROUNDS = 5;
-            let history = [];
+            let history = []; // For building prompt history section
+            let messages = []; // Complete conversation history for the model
             let bestResult = null;
             let bestScore = -Infinity;
             let bestParams = {};
@@ -2069,9 +2078,23 @@ Respond with ONLY a valid JSON object. No markdown, no explanation outside JSON.
                     progFill.style.width = `${((round) / MAX_ROUNDS) * 100}%`;
 
                     const prompt = buildPrompt(unlocked, locked, mode, history);
-                    const response = await callGemma(prompt);
 
-                    if (!response.params) throw new Error('Invalid AI response format');
+                    // Add user prompt to messages array
+                    messages.push({ role: 'user', content: prompt });
+
+                    const response = await callGemma(messages);
+
+                    const responseParams = response.parsed.params;
+                    const responseReasoning = response.parsed.reasoning;
+
+                    if (!responseParams) throw new Error('Invalid AI response format');
+
+                    // Preserve assistant response with reasoning_details
+                    messages.push({
+                        role: 'assistant',
+                        content: response.content,
+                        reasoning_details: response.reasoning_details
+                    });
 
                     // Build state
                     let state = { 'in-mode': mode };
@@ -2081,9 +2104,9 @@ Respond with ONLY a valid JSON object. No markdown, no explanation outside JSON.
                         if (el) state[id] = parseFloat(el.value);
                     }
                     // Apply AI suggestions with bounds clamping
-                    for (let k in response.params) {
+                    for (let k in responseParams) {
                         if (unlocked[k]) {
-                            let v = parseFloat(response.params[k]);
+                            let v = parseFloat(responseParams[k]);
                             v = Math.max(unlocked[k].min, Math.min(unlocked[k].max, v));
                             state[k] = v;
                         }
@@ -2092,9 +2115,9 @@ Respond with ONLY a valid JSON object. No markdown, no explanation outside JSON.
                     let simResult = runSim(state);
                     let range = simResult.range || 0;
                     let apogee = simResult.apogee || 0;
-                    let reasoning = response.reasoning || '';
+                    let reasoning = responseReasoning || '';
 
-                    history.push({ params: response.params, range, apogee });
+                    history.push({ params: responseParams, range, apogee });
 
                     let isBest = range > bestScore;
                     if (isBest) {
