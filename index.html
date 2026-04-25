@@ -379,7 +379,10 @@
                 <legend>Energy & Propellant</legend>
                 <div class="input-row">
                     <label>Bottle Volume (L)<span class="help-tip" title="Thể tích chai (Lít)">?</span></label>
-                    <input type="number" id="in-v-bottle" value="2.0" step="0.1" onchange="runSimUI()">
+                    <div style="display: flex; align-items: center;">
+                        <input type="number" id="in-v-bottle" value="2.0" step="0.1" onchange="runSimUI()">
+                        <button class="opt-lock locked" onclick="toggleLock(this)" data-target="in-v-bottle" title="Click to Lock/Unlock for Optimizer">🔒</button>
+                    </div>
                 </div>
                 <div class="input-row" id="row-water-ratio">
                     <label id="lbl-water-ratio">Water Ratio (%)<span class="help-tip" title="Tỉ lệ nước (%)">?</span></label>
@@ -390,11 +393,17 @@
                 </div>
                 <div class="input-row" id="row-air-pressure">
                     <label>Initial Pressure (PSI)<span class="help-tip" title="Áp suất ban đầu (PSI)">?</span></label>
-                    <input type="number" id="in-pressure" value="80" step="5" onchange="runSimUI()">
+                    <div style="display: flex; align-items: center;">
+                        <input type="number" id="in-pressure" value="80" step="5" onchange="runSimUI()">
+                        <button class="opt-lock locked" onclick="toggleLock(this)" data-target="in-pressure" title="Click to Lock/Unlock for Optimizer">🔒</button>
+                    </div>
                 </div>
                 <div class="input-row">
                     <label>Burst Limit (PSI)<span class="help-tip" title="Áp suất giới hạn nổ chai (PSI)">?</span></label>
-                    <input type="number" id="in-burst" value="150" step="5" onchange="runSimUI()" style="color:var(--red);">
+                    <div style="display: flex; align-items: center;">
+                        <input type="number" id="in-burst" value="150" step="5" onchange="runSimUI()" style="color:var(--red);">
+                        <button class="opt-lock locked" onclick="toggleLock(this)" data-target="in-burst" title="Click to Lock/Unlock for Optimizer">🔒</button>
+                    </div>
                 </div>
             </fieldset>
 
@@ -423,15 +432,24 @@
                 </div>
                 <div class="input-row">
                     <label>Acid Conc. % (m/v)<span class="help-tip" title="Nồng độ axit của giấm (%)">?</span></label>
-                    <input type="number" id="in-acid-conc" value="5" step="1" onchange="runSimUI()">
+                    <div style="display: flex; align-items: center;">
+                        <input type="number" id="in-acid-conc" value="5" step="1" onchange="runSimUI()">
+                        <button class="opt-lock locked" onclick="toggleLock(this)" data-target="in-acid-conc" title="Click to Lock/Unlock for Optimizer">🔒</button>
+                    </div>
                 </div>
                 <div class="input-row">
                     <label>Gas Yield Eff. (%)<span class="help-tip" title="Hiệu suất sinh khí (đã trừ hao hụt do hòa tan CO2 và rò rỉ khí)">?</span></label>
-                    <input type="number" id="in-gas-eff" value="65" step="1" onchange="runSimUI()">
+                    <div style="display: flex; align-items: center;">
+                        <input type="number" id="in-gas-eff" value="65" step="1" onchange="runSimUI()">
+                        <button class="opt-lock locked" onclick="toggleLock(this)" data-target="in-gas-eff" title="Click to Lock/Unlock for Optimizer">🔒</button>
+                    </div>
                 </div>
                 <div class="input-row">
                     <label>Pop-off Pressure (PSI)<span class="help-tip" title="Áp suất bung nắp đậy bệ phóng (PSI)">?</span></label>
-                    <input type="number" id="in-popoff" value="60" step="5" onchange="runSimUI()">
+                    <div style="display: flex; align-items: center;">
+                        <input type="number" id="in-popoff" value="60" step="5" onchange="runSimUI()">
+                        <button class="opt-lock locked" onclick="toggleLock(this)" data-target="in-popoff" title="Click to Lock/Unlock for Optimizer">🔒</button>
+                    </div>
                 </div>
             </fieldset>
 
@@ -507,7 +525,10 @@
                 </div>
                 <div class="input-row">
                     <label>Air Temp (C)<span class="help-tip" title="Nhiệt độ không khí (Độ C)">?</span></label>
-                    <input type="number" id="in-temp" value="15" step="1" onchange="runSimUI()">
+                    <div style="display: flex; align-items: center;">
+                        <input type="number" id="in-temp" value="15" step="1" onchange="runSimUI()">
+                        <button class="opt-lock locked" onclick="toggleLock(this)" data-target="in-temp" title="Click to Lock/Unlock for Optimizer">🔒</button>
+                    </div>
                 </div>
                 <div class="input-row">
                     <label>Environment<span class="help-tip" title="Môi trường (Độ cao so với mực nước biển)">?</span></label>
@@ -1400,9 +1421,15 @@
                 
                 // Dynamic Optimization Bounds based on Unlocked Inputs
                 const allBounds = {
+                    'in-v-bottle': [0.5, 3.0],
                     'in-water-ratio': [5, 80],
+                    'in-pressure': [20, 150],
+                    'in-burst': [50, 200],
                     'in-mass-salt': [1, 200],
                     'in-vol-vinegar': [100, 2000],
+                    'in-acid-conc': [3, 20],
+                    'in-gas-eff': [30, 100],
+                    'in-popoff': [20, 150],
                     'in-d-nozzle': [5, 25],
                     'in-l-tube': [0, 1.5],
                     'in-d-tube': [5, 25],
@@ -1410,7 +1437,8 @@
                     'in-cd': [0.2, 0.8],
                     'in-m-empty': [0.05, 0.5],
                     'in-m-ballast': [0, 0.5],
-                    'in-angle': [10, 80]
+                    'in-angle': [10, 80],
+                    'in-temp': [0, 40]
                 };
 
                 let bounds = {};
@@ -1523,7 +1551,7 @@
                 if (globalBestScore > 0) {
                     for(let j=0; j<num_dims; j++) {
                         let val = globalBestPos[j];
-                        if (['in-water-ratio', 'in-angle', 'in-vol-vinegar', 'in-mass-salt', 'in-d-body'].includes(keys[j])) {
+                        if (['in-water-ratio', 'in-angle', 'in-vol-vinegar', 'in-mass-salt', 'in-d-body', 'in-temp', 'in-pressure', 'in-popoff', 'in-burst'].includes(keys[j])) {
                             val = Math.round(val);
                         } else if (keys[j] === 'in-l-tube') {
                             val = val.toFixed(2);
