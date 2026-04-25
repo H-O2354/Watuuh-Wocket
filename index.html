@@ -362,12 +362,16 @@
                     <input type="number" id="in-v-bottle" value="2.0" step="0.1" onchange="runSimUI()">
                 </div>
                 <div class="input-row" id="row-water-ratio">
-                    <label>Water Ratio (%)<span class="help-tip" title="Tỉ lệ nước (%)">?</span></label>
-                    <input type="number" id="in-water-ratio" value="35" step="1" onchange="runSimUI()">
+                    <label id="lbl-water-ratio">Water Ratio (%)<span class="help-tip" title="Tỉ lệ nước (%)">?</span></label>
+                    <input type="number" id="in-water-ratio" value="35" step="0.001" onchange="runSimUI()">
                 </div>
                 <div class="input-row" id="row-air-pressure">
                     <label>Initial Pressure (PSI)<span class="help-tip" title="Áp suất ban đầu (PSI)">?</span></label>
                     <input type="number" id="in-pressure" value="80" step="5" onchange="runSimUI()">
+                </div>
+                <div class="input-row">
+                    <label>Burst Limit (PSI)<span class="help-tip" title="Áp suất giới hạn nổ chai (PSI)">?</span></label>
+                    <input type="number" id="in-burst" value="150" step="5" onchange="runSimUI()" style="color:var(--red);">
                 </div>
             </fieldset>
 
@@ -393,12 +397,12 @@
                     <input type="number" id="in-acid-conc" value="5" step="1" onchange="runSimUI()">
                 </div>
                 <div class="input-row">
-                    <label>Pop-off Pressure (PSI)<span class="help-tip" title="Áp suất bung nắp đậy bệ phóng (PSI)">?</span></label>
-                    <input type="number" id="in-popoff" value="60" step="5" onchange="runSimUI()">
+                    <label>Gas Yield Eff. (%)<span class="help-tip" title="Hiệu suất sinh khí (đã trừ hao hụt do hòa tan CO2 và rò rỉ khí)">?</span></label>
+                    <input type="number" id="in-gas-eff" value="65" step="1" onchange="runSimUI()">
                 </div>
                 <div class="input-row">
-                    <label>Burst Limit (PSI)<span class="help-tip" title="Áp suất giới hạn nổ chai (PSI)">?</span></label>
-                    <input type="number" id="in-burst" value="150" step="5" onchange="runSimUI()" style="color:var(--red);">
+                    <label>Pop-off Pressure (PSI)<span class="help-tip" title="Áp suất bung nắp đậy bệ phóng (PSI)">?</span></label>
+                    <input type="number" id="in-popoff" value="60" step="5" onchange="runSimUI()">
                 </div>
             </fieldset>
 
@@ -407,6 +411,10 @@
                 <div class="input-row">
                     <label>Nozzle Dia. (mm)<span class="help-tip" title="Đường kính vòi phun (mm)">?</span></label>
                     <input type="number" id="in-d-nozzle" value="21" step="0.5" onchange="runSimUI()">
+                </div>
+                <div class="input-row" id="row-cork-friction">
+                    <label style="color:#728b9c;">-> Cork Friction<span class="help-tip" title="Lực ma sát tĩnh của nút chai (kgf) tương ứng với Launch/Pop-off Pressure">?</span></label>
+                    <span id="val-cork-friction" style="color:var(--cyan); font-weight:bold; font-size: 14px; text-align: right; width: 110px;">0.0 kgf</span>
                 </div>
                 <div class="input-row">
                     <label>Launch Tube Len. (m)<span class="help-tip" title="Chiều dài ống dẫn phóng (m)">?</span></label>
@@ -589,6 +597,20 @@
                 <p><em>* Chemical mode applies a 0.4x penalty to $v_e$ due to foam (two-phase flow) choking.</em></p>
             </div>
 
+            <div class="math-section">
+                <h3>7. Pop-off Static Friction</h3>
+                <p>The cork pops when internal pressure overcomes the static friction $F_{friction}$.</p>
+                <p>$$ F_{friction} = P_{pop} \times A_{nozzle} $$</p>
+                <p><em>The required friction is calibrated by hanging a mass equivalent to $F_{friction}/g$ (in kg) from the cork.</em></p>
+            </div>
+
+            <div class="math-section">
+                <h3>8. Gas Yield & Stoichiometry</h3>
+                <p>Due to CO$_2$ solubility in water and leakage during loading, the actual pressure is governed by an efficiency factor $\eta_{gas}$ (typically ~65%). This necessitates 1.5x - 2.0x theoretical fuel to reach target $P_{pop}$.</p>
+                <p>$$ P_{calc} = \frac{(\eta_{gas} \cdot n_{CO2}) R T}{V_{air}} + P_{atm} $$</p>
+                <p><em>As long as $P_{calc} \ge P_{pop}$, the rocket will launch at exactly $P_{pop}$ regardless of excess fuel.</em></p>
+            </div>
+
         </div>
     </div>
 
@@ -740,16 +762,19 @@
             const mode = document.getElementById('in-mode').value;
             const chemPanel = document.getElementById('group-chem');
             const airPressureRow = document.getElementById('row-air-pressure');
+            const waterRatioLbl = document.getElementById('lbl-water-ratio');
             
             if (mode === "CHEM") {
                 chemPanel.classList.remove('hidden');
                 airPressureRow.classList.add('hidden');
-                // Auto calculate water ratio based on vinegar volume
+                // Auto calculate external water based on 1/3 volume constraint
                 document.getElementById('in-water-ratio').disabled = true;
+                if(waterRatioLbl) waterRatioLbl.innerHTML = 'External Water (L)<span class="help-tip" title="Lượng nước lã cần châm thêm (Lít)">?</span>';
             } else {
                 chemPanel.classList.add('hidden');
                 airPressureRow.classList.remove('hidden');
                 document.getElementById('in-water-ratio').disabled = false;
+                if(waterRatioLbl) waterRatioLbl.innerHTML = 'Water Ratio (%)<span class="help-tip" title="Tỉ lệ nước (%)">?</span>';
             }
             runSimUI();
         }
@@ -944,21 +969,22 @@
             }
         };
 
-        function getParamsFromUI() {
-            let mode = document.getElementById('in-mode').value;
-            let V_bottle = parseFloat(document.getElementById('in-v-bottle').value) / 1000; // m3
+        function getParams(state = null) {
+            const val = (id) => (state && state[id] !== undefined) ? state[id] : parseFloat(document.getElementById(id).value);
+            const mode = (state && state['in-mode'] !== undefined) ? state['in-mode'] : document.getElementById('in-mode').value;
+            let V_bottle = val('in-v-bottle') / 1000; // m3
             
             let params = {
-                theta0: parseFloat(document.getElementById('in-angle').value) * Math.PI / 180,
+                theta0: val('in-angle') * Math.PI / 180,
                 V_bottle: V_bottle,
-                A_e: Math.PI / 4 * Math.pow(parseFloat(document.getElementById('in-d-nozzle').value)/1000, 2),
-                L_tube: parseFloat(document.getElementById('in-l-tube').value),
-                A_tube: Math.PI / 4 * Math.pow(parseFloat(document.getElementById('in-d-tube').value)/1000, 2),
-                A_ref: Math.PI / 4 * Math.pow(parseFloat(document.getElementById('in-d-body').value)/1000, 2),
-                Cd: parseFloat(document.getElementById('in-cd').value),
-                m_dry: parseFloat(document.getElementById('in-m-empty').value) + parseFloat(document.getElementById('in-m-ballast').value),
-                rho_a: parseFloat(document.getElementById('in-env').value),
-                T_env: parseFloat(document.getElementById('in-temp').value) + 273.15,
+                A_e: Math.PI / 4 * Math.pow(val('in-d-nozzle')/1000, 2),
+                L_tube: val('in-l-tube'),
+                A_tube: Math.PI / 4 * Math.pow(val('in-d-tube')/1000, 2),
+                A_ref: Math.PI / 4 * Math.pow(val('in-d-body')/1000, 2),
+                Cd: val('in-cd'),
+                m_dry: val('in-m-empty') + val('in-m-ballast'),
+                rho_a: val('in-env'),
+                T_env: val('in-temp') + 273.15,
                 g: g,
                 P_atm: P_atm
             };
@@ -970,72 +996,126 @@
             let V_liquid, rho_fluid, P_init_Pa;
             let exploded = false;
             let status = "NOMINAL";
+            let failure_score = 0;
 
             if (mode === "AIR") {
-                let wRatio = parseFloat(document.getElementById('in-water-ratio').value);
+                let wRatio = val('in-water-ratio');
                 V_liquid = V_bottle * (wRatio / 100);
                 rho_fluid = 1000;
-                P_init_Pa = parseFloat(document.getElementById('in-pressure').value) * 6894.76 + P_atm;
-            } else {
-                let vol_vin = parseFloat(document.getElementById('in-vol-vinegar').value); // ml
                 
-                let acid_conc = parseFloat(document.getElementById('in-acid-conc').value);
+                let p_air = val('in-pressure');
+                let p_burst = val('in-burst');
+                P_init_Pa = p_air * 6894.76 + P_atm;
+                
+                // Calculate Required Cork Friction
+                if (!state) {
+                    let force_N = (p_air * 6894.76) * params.A_e;
+                    let force_kgf = force_N / params.g;
+                    let corkUI = document.getElementById('val-cork-friction');
+                    if (corkUI) corkUI.innerText = force_kgf.toFixed(1) + ' kgf';
+                }
+                
+                if (p_air >= p_burst) {
+                    exploded = true;
+                    status = `BURST WARNING: PUMPED > BURST LIMIT`;
+                    failure_score = -1000 - (p_air - p_burst);
+                } else {
+                    status = `SUCCESS: NOMINAL LAUNCH AT ${p_air} PSI`;
+                }
+            } else {
+                let vol_vin = val('in-vol-vinegar'); // ml
+                
+                let acid_conc = val('in-acid-conc');
                 let mass_acid = vol_vin * (acid_conc / 100);
                 let mol_acid = mass_acid / 60.05;
 
-                let salt_type = parseFloat(document.getElementById('in-salt-type').value); // 84 or 106
-                let mass_salt = parseFloat(document.getElementById('in-mass-salt').value);
+                let salt_type = val('in-salt-type'); // 84 or 106
+                let mass_salt = val('in-mass-salt');
                 let mol_salt = mass_salt / salt_type;
 
                 let mol_co2 = (salt_type === 84) ? Math.min(mol_acid, mol_salt) : Math.min(mol_acid/2, mol_salt);
                 
-                // Add generated water to the liquid volume
-                // 1 mole of CO2 produced means 1 mole of H2O produced (18.015 g)
-                let mass_water_gen = mol_co2 * 18.015;
-                let vol_water_gen = mass_water_gen; // density is 1g/ml, so grams = ml
+                // --- STOICHIOMETRY & FLUID VOLUME CALCULATIONS ---
+                // Enforce Total Liquid Volume = 1/3 of Bottle Volume
+                V_liquid = V_bottle / 3.0; // m3
                 
-                let total_liquid_ml = vol_vin + vol_water_gen;
-                V_liquid = total_liquid_ml / 1000000; // m3
-
-                // Update ratio UI
-                document.getElementById('in-water-ratio').value = ((V_liquid / V_bottle)*100).toFixed(1);
+                // 1. Water inherently in vinegar (ml)
+                let vol_water_in_vinegar = vol_vin - (mass_acid / 1.05); // Density of acetic acid is ~1.05 g/ml
+                
+                // 2. Water produced by reaction (ml = g)
+                let vol_water_gen = mol_co2 * 18.015;
+                
+                // 3. Salt dissolved volume displacement (ml)
+                // Sodium acetate (~82 g/mol), specific volume ~0.45 ml/g
+                let mass_salt_produced = mol_co2 * 82.03;
+                let vol_salt_dissolved = mass_salt_produced * 0.45;
+                
+                let total_internal_fluid_ml = vol_water_in_vinegar + vol_water_gen + vol_salt_dissolved;
+                
+                let external_water_ml = (V_liquid * 1000000) - total_internal_fluid_ml;
+                if (external_water_ml < 0) {
+                    failure_score = external_water_ml; // Penalty for excess fluid
+                    external_water_ml = 0; 
+                }
+                
+                // Update ratio UI to show External Water in Liters (only if not optimizing)
+                if (!state) {
+                    document.getElementById('in-water-ratio').value = (external_water_ml / 1000).toFixed(3);
+                }
+                
+                // Recalculate V_liquid if we floored external_water_ml to 0
+                V_liquid = (external_water_ml + total_internal_fluid_ml) / 1000000;
 
                 let V_air = V_bottle - V_liquid;
                 
-                let p_pop = parseFloat(document.getElementById('in-popoff').value);
-                let p_burst = parseFloat(document.getElementById('in-burst').value);
+                let p_pop = val('in-popoff');
+                let p_burst = val('in-burst');
+                
+                // Calculate Required Cork Friction
+                if (!state) {
+                    let p_pop_Pa = p_pop * 6894.76;
+                    let force_N = p_pop_Pa * params.A_e;
+                    let force_kgf = force_N / params.g;
+                    let corkUI = document.getElementById('val-cork-friction');
+                    if (corkUI) corkUI.innerText = force_kgf.toFixed(1) + ' kgf';
+                }
+
+                // Apply Gas Yield Efficiency for effective pressure calculation
+                let gas_eff = val('in-gas-eff') / 100;
+                let effective_mol_co2 = mol_co2 * gas_eff;
 
                 if (V_air <= 0) {
                     exploded = true;
                     status = `BURST WARNING: LIQUID OVERFLOW! V_AIR <= 0`;
+                    failure_score -= 5000;
                 } else {
-                    let P_calc = (mol_co2 * 8.314 * params.T_env) / V_air + P_atm;
+                    let P_calc = (effective_mol_co2 * 8.314 * params.T_env) / V_air + P_atm;
                     let P_calc_PSI = (P_calc - P_atm) / 6894.76;
                     
                     if (p_pop >= p_burst) {
                         exploded = true;
                         status = `BURST WARNING: POPOFF >= BURST LIMIT`;
+                        failure_score -= 2000;
                     } else if (P_calc_PSI >= p_burst && p_pop > p_burst) {
                         exploded = true;
                         status = `BURST WARNING: > ${p_burst} PSI`;
+                        failure_score = -1000 - (P_calc_PSI - p_burst);
                     } else if (P_calc_PSI < p_pop) {
                         exploded = true;
                         status = `FAILURE: REACHED ONLY ${P_calc_PSI.toFixed(1)} PSI (POPOFF: ${p_pop})`;
+                        failure_score = -1000 - (p_pop - P_calc_PSI);
                     } else {
                         // Successful pop-off at p_pop
                         P_init_Pa = p_pop * 6894.76 + P_atm;
                         status = `SUCCESS: POPS OFF AT ${p_pop} PSI`;
+                        failure_score = 0;
                     }
                 }
                 
                 // Density of the resulting mixture
-                // Assuming mass of remaining salt, sodium acetate, water, etc.
-                let total_mass_fluid = (vol_vin * 1.0) + mass_salt; 
-                // Subtract the mass of CO2 that leaves the liquid phase
                 let mass_co2 = mol_co2 * 44.01;
-                total_mass_fluid -= mass_co2;
-                
-                rho_fluid = total_mass_fluid / total_liquid_ml * 1000;
+                let total_mass_fluid = external_water_ml + (vol_vin * 1.006) + mass_salt - mass_co2;
+                rho_fluid = total_mass_fluid / (V_liquid * 1000000) * 1000;
             }
 
             params.m_water_init = V_liquid * rho_fluid;
@@ -1043,20 +1123,18 @@
             params.rho_fluid = rho_fluid;
             params.exploded = exploded;
             params.status = status;
+            params.failure_score = failure_score;
             params.is_chem = (mode === "CHEM");
             params.V_liquid = V_liquid;
 
             return params;
         }
 
-        function runSimUI(silent = false) {
-            const params = getParamsFromUI();
-            
-            if (!silent) setStatus(params.status, params.exploded);
+        function runSim(state = null) {
+            const params = getParams(state);
             
             if (params.exploded) {
-                if(!silent) clearCharts();
-                return null;
+                return { range: 0, apogee: 0, ideal_range: 0, score: params.failure_score, params: params };
             }
 
             const res = Engine.simulate(params);
@@ -1078,11 +1156,24 @@
             let v0_ideal = v_tube + delta_v_water;
             let ideal_range = (v0_ideal * v0_ideal * Math.sin(2 * params.theta0)) / g;
 
-            if (!silent) {
-                updateUI(res, ideal_range, v0_ideal, params);
+            return { range: res.x[res.ptr-1], apogee: res.apogee, ideal_range: ideal_range, score: res.x[res.ptr-1], res: res, v0_ideal: v0_ideal, params: params };
+        }
+
+        function runSimUI(silent = false) {
+            let result = runSim(null);
+            
+            if (!silent) setStatus(result.params.status, result.params.exploded);
+            
+            if (result.params.exploded) {
+                if(!silent) clearCharts();
+                return null;
             }
 
-            return { range: res.x[res.ptr-1], apogee: res.apogee, ideal_range: ideal_range };
+            if (!silent) {
+                updateUI(result.res, result.ideal_range, result.v0_ideal, result.params);
+            }
+
+            return result;
         }
 
         function updateUI(res, ideal_range, v0_ideal, params) {
@@ -1268,10 +1359,13 @@
                     };
                 }
 
-                // Save original values in case PSO fails
-                const originalValues = {};
-                for(let key in bounds) {
-                    originalValues[key] = parseFloat(document.getElementById(key).value);
+                // Pre-fetch base state to avoid DOM reads during optimization
+                let baseState = { 'in-mode': mode };
+                const allInputIds = ['in-v-bottle', 'in-water-ratio', 'in-pressure', 'in-salt-type', 'in-mass-salt', 'in-vol-vinegar', 'in-acid-conc', 'in-gas-eff', 'in-popoff', 'in-burst', 'in-d-nozzle', 'in-l-tube', 'in-d-tube', 'in-d-body', 'in-cd', 'in-m-empty', 'in-m-ballast', 'in-angle', 'in-temp', 'in-env'];
+                for (let id of allInputIds) {
+                    if (document.getElementById(id)) {
+                        baseState[id] = parseFloat(document.getElementById(id).value);
+                    }
                 }
 
                 const NUM_PARTICLES = 60;
@@ -1281,7 +1375,7 @@
 
                 let particles = [];
                 let globalBestPos = [];
-                let globalBestScore = -1;
+                let globalBestScore = -100000;
 
                 // Initialize swarm
                 for(let i=0; i<NUM_PARTICLES; i++) {
@@ -1293,30 +1387,30 @@
                         pos.push(min + Math.random() * (max - min));
                         vel.push((Math.random() - 0.5) * (max - min) * 0.2);
                     }
-                    particles.push({ pos: pos, vel: vel, bestPos: [...pos], bestScore: -1 });
+                    particles.push({ pos: pos, vel: vel, bestPos: [...pos], bestScore: -100000 });
                 }
 
-                const c1 = 1.5; // Cognitive
-                const c2 = 1.5; // Social
+                const c1 = 1.5; 
+                const c2 = 1.5; 
 
                 for(let iter=0; iter<NUM_ITERATIONS; iter++) {
-                    let w = 0.9 - (0.5 * iter / NUM_ITERATIONS); // Decaying inertia for better convergence
+                    let w = 0.9 - (0.5 * iter / NUM_ITERATIONS); 
                     
                     for(let i=0; i<NUM_PARTICLES; i++) {
                         let p = particles[i];
                         
-                        // Set DOM inputs
+                        let state = { ...baseState };
                         for(let j=0; j<num_dims; j++) {
                             // Constraint: Launch tube dia <= nozzle dia
                             if (keys[j] === 'in-d-tube') {
                                 let nozzleIdx = keys.indexOf('in-d-nozzle');
                                 if (nozzleIdx !== -1 && p.pos[j] > p.pos[nozzleIdx]) p.pos[j] = p.pos[nozzleIdx];
                             }
-                            document.getElementById(keys[j]).value = p.pos[j];
+                            state[keys[j]] = p.pos[j];
                         }
                         
-                        let res = runSimUI(true);
-                        let score = (res) ? res.range : 0;
+                        let simResult = runSim(state);
+                        let score = simResult.score;
                         
                         if (score > p.bestScore) {
                             p.bestScore = score;
@@ -1361,10 +1455,7 @@
                     }
                     setStatus(`PSO SUCCESS: Max Range ${globalBestScore.toFixed(2)}m found!`);
                 } else {
-                    for(let key in originalValues) {
-                        document.getElementById(key).value = originalValues[key];
-                    }
-                    setStatus(`PSO FAILED: No valid non-exploding trajectory found.`, true);
+                    setStatus(`PSO FAILED: No valid non-exploding trajectory found. Score: ${globalBestScore.toFixed(2)}`, true);
                 }
                 
                 runSimUI(false);
@@ -1372,7 +1463,7 @@
                 btn.innerText = "> OPTIMIZE RANGE <";
                 btn.style.backgroundColor = 'transparent';
                 btn.style.color = 'var(--green)';
-            }, 100);
+            }, 50);
         }
 
         // Initialize
