@@ -8,8 +8,10 @@
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
     
-    <!-- Chart.js -->
+    <!-- Chart.js & Plugins -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
     
     <!-- MathJax for rendering equations -->
     <script>
@@ -527,6 +529,9 @@
                         <option value="m">Mass (kg)</option>
                     </select>
                 </div>
+                <div class="input-row" style="margin: 0; margin-left: auto;">
+                    <button onclick="if(chartMain) chartMain.resetZoom()" style="background: transparent; color: var(--text-main); border: 1px solid var(--border-color); padding: 5px 15px; border-radius: 4px; cursor: pointer;">Reset Zoom</button>
+                </div>
             </div>
 
             <div class="charts-wrapper" style="display: flex;">
@@ -698,7 +703,15 @@
                     responsive: true, maintainAspectRatio: false,
                     animation: false,
                     interaction: { mode: 'nearest', axis: 'x', intersect: false },
-                    plugins: { legend: { labels: { font: { size: 11 } } } },
+                    plugins: { 
+                        legend: { labels: { font: { size: 11 } } },
+                        zoom: {
+                            zoom: {
+                                drag: { enabled: true, backgroundColor: 'rgba(0, 243, 255, 0.2)' },
+                                mode: 'xy',
+                            }
+                        }
+                    },
                     scales: {
                         x: { type: 'linear', position: 'bottom', title: {display: true, text: 'X-Axis', color: '#00f3ff'}, grid: {color: '#1a2c42'} },
                         y1: { type: 'linear', position: 'left', title: {display: true, text: 'Y1', color: '#00f3ff'}, grid: {color: '#1a2c42'} },
@@ -1161,6 +1174,9 @@
 
             // Set chart limits
             let max_x = Math.max(...Array.from(res[xKey].slice(0, res.ptr)));
+            if (xKey === 'x' && (y1Key === 'y' || y2Key === 'y')) {
+                if (ideal_range > max_x) max_x = ideal_range;
+            }
             chartMain.options.scales.x.max = max_x * 1.05;
 
             chartMain.data.datasets = datasets;
