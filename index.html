@@ -692,6 +692,7 @@
         let chartMain;
 
         function initCharts() {
+            if (window.zoomPlugin) Chart.register(window.zoomPlugin);
             Chart.defaults.color = '#728b9c';
             Chart.defaults.font.family = "'Roboto Mono', monospace";
             Chart.defaults.borderColor = '#1a2c42';
@@ -776,6 +777,7 @@
                         // Tube phase: works like a piston
                         Thrust = P_eff * params.A_tube;
                         if (params.is_chem) Thrust *= 0.5; // Foam compressability loss
+                        Thrust *= 0.9; // Friction and leakage loss
                         dV_air_dt = params.A_tube * v_mag;
                         dm_dt = 0;
                     } else {
@@ -802,25 +804,28 @@
                     } else {
                         // Gas thrust phase (Choked Flow)
                         let pratio = P_atm / P;
-                        let choke_limit = 0.455;
+                        let choke_limit = Math.pow(2 / (gamma + 1), gamma / (gamma - 1)); // ~0.528 for air
                         let mdot_gas, v_gas;
                         
+                        // Adiabatic cooling of the chamber gas
+                        let T_chamber = params.T_env * Math.pow(P / params.P_init, (gamma - 1) / gamma);
+                        
                         if (pratio < choke_limit) { // Choked
-                            v_gas = Math.sqrt(gamma * R_spec * params.T_env);
-                            let coeff = Math.sqrt(gamma / (R_spec * params.T_env)) * Math.pow(2 / (gamma + 1), (gamma + 1) / (2 * (gamma - 1)));
+                            v_gas = Math.sqrt(gamma * R_spec * T_chamber);
+                            let coeff = Math.sqrt(gamma / (R_spec * T_chamber)) * Math.pow(2 / (gamma + 1), (gamma + 1) / (2 * (gamma - 1)));
                             mdot_gas = params.A_e * P * coeff;
                             Thrust = mdot_gas * v_gas + (P * choke_limit - P_atm) * params.A_e;
                         } else { // Subsonic
                             let mach_sq = (2 / (gamma - 1)) * (Math.pow(1 / pratio, (gamma - 1) / gamma) - 1);
                             mach_sq = Math.max(0, mach_sq);
-                            v_gas = Math.sqrt(mach_sq * gamma * R_spec * params.T_env);
-                            let T_exit = params.T_env / (1 + (gamma - 1) / 2 * mach_sq);
+                            v_gas = Math.sqrt(mach_sq * gamma * R_spec * T_chamber);
+                            let T_exit = T_chamber / (1 + (gamma - 1) / 2 * mach_sq);
                             let rho_exit = P_atm / (R_spec * T_exit);
                             mdot_gas = params.A_e * rho_exit * v_gas;
                             Thrust = mdot_gas * v_gas;
                         }
                         
-                        let rho_chamber = P / (R_spec * params.T_env);
+                        let rho_chamber = P / (R_spec * T_chamber);
                         let dV_gas = mdot_gas / rho_chamber;
                         dP_dt = -gamma * (P / params.V_bottle) * dV_gas;
                         dm_dt = 0; // Gas mass is neglected in structural mass to save computation
@@ -1043,10 +1048,21 @@
 
             const res = Engine.simulate(params);
 
-            // Calculate Tsiolkovsky Ideal trajectory
-            let u_eq = Math.sqrt(2 * (params.P_init - P_atm) / params.rho_fluid);
-            if (params.is_chem) u_eq *= 0.4;
-            let v0_ideal = u_eq * Math.log(1 + params.m_water_init / params.m_dry);
+            // Calculate Tsiolkovsky Ideal trajectory + Launch Tube Piston Effect
+            let P_eff_init = params.P_init - P_atm;
+            
+            // 1. Velocity from Launch Tube
+            let work_tube = P_eff_init * params.A_tube * params.L_tube;
+            if (params.is_chem) work_tube *= 0.5; // Foam compressability loss
+            work_tube *= 0.9; // Friction and leakage loss
+            let v_tube = Math.sqrt(2 * work_tube / (params.m_dry + params.m_water_init));
+            
+            // 2. Velocity from Water Expulsion (Tsiolkovsky)
+            let u_eq = Math.sqrt(2 * P_eff_init / params.rho_fluid);
+            if (params.is_chem) u_eq *= 0.4; // Foam choking penalty
+            let delta_v_water = u_eq * Math.log(1 + params.m_water_init / params.m_dry);
+            
+            let v0_ideal = v_tube + delta_v_water;
             let ideal_range = (v0_ideal * v0_ideal * Math.sin(2 * params.theta0)) / g;
 
             if (!silent) {
@@ -1078,6 +1094,13 @@
                 'v': 'Velocity (m/s)', 'a': 'Acceleration (m/s²)', 
                 'T': 'Thrust (N)', 'P': 'Pressure (PSI)', 'm': 'Mass (kg)'
             };
+            
+            const units = {
+                'x': 'm', 't': 's', 'y': 'm', 'v': 'm/s', 'a': 'm/s²', 
+                'T': 'N', 'P': 'PSI', 'm': 'kg'
+            };
+            
+            let useSingleAxis = (y2Key !== 'none' && units[y1Key] === units[y2Key]);
 
             // Build dataset generator
             const buildData = (yKey) => {
@@ -1163,14 +1186,14 @@
                     showLine: true,
                     borderWidth: 2,
                     pointRadius: 0,
-                    yAxisID: 'y2'
+                    yAxisID: useSingleAxis ? 'y1' : 'y2'
                 });
             }
 
             chartMain.options.scales.x.title.text = labels[xKey];
             chartMain.options.scales.y1.title.text = labels[y1Key];
-            chartMain.options.scales.y2.display = y2Key !== 'none';
-            if(y2Key !== 'none') chartMain.options.scales.y2.title.text = labels[y2Key];
+            chartMain.options.scales.y2.display = (y2Key !== 'none' && !useSingleAxis);
+            if(y2Key !== 'none' && !useSingleAxis) chartMain.options.scales.y2.title.text = labels[y2Key];
 
             // Set chart limits
             let max_x = Math.max(...Array.from(res[xKey].slice(0, res.ptr)));
@@ -1219,9 +1242,8 @@
                     };
                 } else {
                     bounds = {
+                        'in-mass-salt': [1, 200],
                         'in-vol-vinegar': [100, 2000],
-                        'in-popoff': [10, 150],
-                        'in-burst': [10, 200],
                         'in-d-nozzle': [5, 25],
                         'in-l-tube': [0, 1.5],
                         'in-d-tube': [5, 25],
@@ -1239,8 +1261,8 @@
                     originalValues[key] = parseFloat(document.getElementById(key).value);
                 }
 
-                const NUM_PARTICLES = 40;
-                const NUM_ITERATIONS = 40;
+                const NUM_PARTICLES = 60;
+                const NUM_ITERATIONS = 60;
                 const keys = Object.keys(bounds);
                 const num_dims = keys.length;
 
@@ -1261,11 +1283,12 @@
                     particles.push({ pos: pos, vel: vel, bestPos: [...pos], bestScore: -1 });
                 }
 
-                const w = 0.7; // Inertia
                 const c1 = 1.5; // Cognitive
                 const c2 = 1.5; // Social
 
                 for(let iter=0; iter<NUM_ITERATIONS; iter++) {
+                    let w = 0.9 - (0.5 * iter / NUM_ITERATIONS); // Decaying inertia for better convergence
+                    
                     for(let i=0; i<NUM_PARTICLES; i++) {
                         let p = particles[i];
                         
@@ -1275,11 +1298,6 @@
                             if (keys[j] === 'in-d-tube') {
                                 let nozzleIdx = keys.indexOf('in-d-nozzle');
                                 if (nozzleIdx !== -1 && p.pos[j] > p.pos[nozzleIdx]) p.pos[j] = p.pos[nozzleIdx];
-                            }
-                            // Constraint: Burst limit > popoff limit
-                            if (keys[j] === 'in-burst') {
-                                let popIdx = keys.indexOf('in-popoff');
-                                if (popIdx !== -1 && p.pos[j] <= p.pos[popIdx]) p.pos[j] = p.pos[popIdx] + 5;
                             }
                             document.getElementById(keys[j]).value = p.pos[j];
                         }
@@ -1319,7 +1337,7 @@
                 if (globalBestScore > 0) {
                     for(let j=0; j<num_dims; j++) {
                         let val = globalBestPos[j];
-                        if (['in-water-ratio', 'in-angle', 'in-vol-vinegar', 'in-popoff', 'in-burst', 'in-d-body'].includes(keys[j])) {
+                        if (['in-water-ratio', 'in-angle', 'in-vol-vinegar', 'in-mass-salt', 'in-d-body'].includes(keys[j])) {
                             val = Math.round(val);
                         } else if (keys[j] === 'in-l-tube') {
                             val = val.toFixed(2);
