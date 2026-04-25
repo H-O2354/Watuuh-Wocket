@@ -334,6 +334,26 @@
             transform: scale(1.1);
         }
 
+        /* Optimizer Lock Button */
+        .opt-lock {
+            background: transparent;
+            border: none;
+            color: var(--cyan);
+            font-size: 16px;
+            padding: 0 0 0 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            outline: none;
+            line-height: 1;
+        }
+        .opt-lock:hover {
+            transform: scale(1.2);
+        }
+        .opt-lock.locked {
+            color: var(--red);
+            opacity: 0.7;
+        }
+
     </style>
 </head>
 <body>
@@ -363,7 +383,10 @@
                 </div>
                 <div class="input-row" id="row-water-ratio">
                     <label id="lbl-water-ratio">Water Ratio (%)<span class="help-tip" title="Tỉ lệ nước (%)">?</span></label>
-                    <input type="number" id="in-water-ratio" value="35" step="0.001" onchange="runSimUI()">
+                    <div style="display: flex; align-items: center;">
+                        <input type="number" id="in-water-ratio" value="35" step="0.001" onchange="runSimUI()">
+                        <button class="opt-lock" onclick="toggleLock(this)" data-target="in-water-ratio" title="Click to Lock/Unlock for Optimizer">🔓</button>
+                    </div>
                 </div>
                 <div class="input-row" id="row-air-pressure">
                     <label>Initial Pressure (PSI)<span class="help-tip" title="Áp suất ban đầu (PSI)">?</span></label>
@@ -386,11 +409,17 @@
                 </div>
                 <div class="input-row">
                     <label>Mass of Salt (g)<span class="help-tip" title="Khối lượng bột muối (g)">?</span></label>
-                    <input type="number" id="in-mass-salt" value="60" step="5" onchange="runSimUI()">
+                    <div style="display: flex; align-items: center;">
+                        <input type="number" id="in-mass-salt" value="60" step="5" onchange="runSimUI()">
+                        <button class="opt-lock" onclick="toggleLock(this)" data-target="in-mass-salt" title="Click to Lock/Unlock for Optimizer">🔓</button>
+                    </div>
                 </div>
                 <div class="input-row">
                     <label>Vinegar Volume (ml)<span class="help-tip" title="Thể tích giấm (ml)">?</span></label>
-                    <input type="number" id="in-vol-vinegar" value="600" step="50" onchange="runSimUI()">
+                    <div style="display: flex; align-items: center;">
+                        <input type="number" id="in-vol-vinegar" value="600" step="50" onchange="runSimUI()">
+                        <button class="opt-lock" onclick="toggleLock(this)" data-target="in-vol-vinegar" title="Click to Lock/Unlock for Optimizer">🔓</button>
+                    </div>
                 </div>
                 <div class="input-row">
                     <label>Acid Conc. % (m/v)<span class="help-tip" title="Nồng độ axit của giấm (%)">?</span></label>
@@ -410,7 +439,10 @@
                 <legend>Thrust System</legend>
                 <div class="input-row">
                     <label>Nozzle Dia. (mm)<span class="help-tip" title="Đường kính vòi phun (mm)">?</span></label>
-                    <input type="number" id="in-d-nozzle" value="21" step="0.5" onchange="runSimUI()">
+                    <div style="display: flex; align-items: center;">
+                        <input type="number" id="in-d-nozzle" value="21" step="0.5" onchange="runSimUI()">
+                        <button class="opt-lock locked" onclick="toggleLock(this)" data-target="in-d-nozzle" title="Click to Lock/Unlock for Optimizer">🔒</button>
+                    </div>
                 </div>
                 <div class="input-row" id="row-cork-friction">
                     <label style="color:#728b9c;">-> Cork Friction<span class="help-tip" title="Lực ma sát tĩnh của nút chai (kgf) tương ứng với Launch/Pop-off Pressure">?</span></label>
@@ -418,11 +450,17 @@
                 </div>
                 <div class="input-row">
                     <label>Launch Tube Len. (m)<span class="help-tip" title="Chiều dài ống dẫn phóng (m)">?</span></label>
-                    <input type="number" id="in-l-tube" value="0.3" step="0.05" onchange="runSimUI()">
+                    <div style="display: flex; align-items: center;">
+                        <input type="number" id="in-l-tube" value="0.3" step="0.05" onchange="runSimUI()">
+                        <button class="opt-lock locked" onclick="toggleLock(this)" data-target="in-l-tube" title="Click to Lock/Unlock for Optimizer">🔒</button>
+                    </div>
                 </div>
                 <div class="input-row">
                     <label>Launch Tube Dia. (mm)<span class="help-tip" title="Đường kính ngoài ống dẫn (mm)">?</span></label>
-                    <input type="number" id="in-d-tube" value="21" step="0.5" onchange="runSimUI()">
+                    <div style="display: flex; align-items: center;">
+                        <input type="number" id="in-d-tube" value="21" step="0.5" onchange="runSimUI()">
+                        <button class="opt-lock locked" onclick="toggleLock(this)" data-target="in-d-tube" title="Click to Lock/Unlock for Optimizer">🔒</button>
+                    </div>
                 </div>
             </fieldset>
 
@@ -430,19 +468,31 @@
                 <legend>Aerodynamics & Mass</legend>
                 <div class="input-row">
                     <label>Body Dia. (mm)<span class="help-tip" title="Đường kính thân chai (mm)">?</span></label>
-                    <input type="number" id="in-d-body" value="100" step="5" onchange="runSimUI()">
+                    <div style="display: flex; align-items: center;">
+                        <input type="number" id="in-d-body" value="100" step="5" onchange="runSimUI()">
+                        <button class="opt-lock locked" onclick="toggleLock(this)" data-target="in-d-body" title="Click to Lock/Unlock for Optimizer">🔒</button>
+                    </div>
                 </div>
                 <div class="input-row">
                     <label>Drag Coeff. (Cd)<span class="help-tip" title="Hệ số cản khí động học">?</span></label>
-                    <input type="number" id="in-cd" value="0.35" step="0.01" onchange="runSimUI()">
+                    <div style="display: flex; align-items: center;">
+                        <input type="number" id="in-cd" value="0.35" step="0.01" onchange="runSimUI()">
+                        <button class="opt-lock locked" onclick="toggleLock(this)" data-target="in-cd" title="Click to Lock/Unlock for Optimizer">🔒</button>
+                    </div>
                 </div>
                 <div class="input-row">
                     <label>Empty Mass (kg)<span class="help-tip" title="Khối lượng vỏ rỗng (kg)">?</span></label>
-                    <input type="number" id="in-m-empty" value="0.10" step="0.01" onchange="runSimUI()">
+                    <div style="display: flex; align-items: center;">
+                        <input type="number" id="in-m-empty" value="0.10" step="0.01" onchange="runSimUI()">
+                        <button class="opt-lock locked" onclick="toggleLock(this)" data-target="in-m-empty" title="Click to Lock/Unlock for Optimizer">🔒</button>
+                    </div>
                 </div>
                 <div class="input-row">
                     <label>Nose Ballast (kg)<span class="help-tip" title="Khối lượng đối trọng ở mũi (kg)">?</span></label>
-                    <input type="number" id="in-m-ballast" value="0.05" step="0.01" onchange="runSimUI()">
+                    <div style="display: flex; align-items: center;">
+                        <input type="number" id="in-m-ballast" value="0.05" step="0.01" onchange="runSimUI()">
+                        <button class="opt-lock" onclick="toggleLock(this)" data-target="in-m-ballast" title="Click to Lock/Unlock for Optimizer">🔓</button>
+                    </div>
                 </div>
             </fieldset>
 
@@ -450,7 +500,10 @@
                 <legend>Trajectory & Environment</legend>
                 <div class="input-row">
                     <label>Launch Angle (deg)<span class="help-tip" title="Góc nghiêng bệ phóng (Độ)">?</span></label>
-                    <input type="number" id="in-angle" value="45" step="1" onchange="runSimUI()">
+                    <div style="display: flex; align-items: center;">
+                        <input type="number" id="in-angle" value="45" step="1" onchange="runSimUI()">
+                        <button class="opt-lock" onclick="toggleLock(this)" data-target="in-angle" title="Click to Lock/Unlock for Optimizer">🔓</button>
+                    </div>
                 </div>
                 <div class="input-row">
                     <label>Air Temp (C)<span class="help-tip" title="Nhiệt độ không khí (Độ C)">?</span></label>
@@ -770,11 +823,15 @@
                 // Auto calculate external water based on 1/3 volume constraint
                 document.getElementById('in-water-ratio').disabled = true;
                 if(waterRatioLbl) waterRatioLbl.innerHTML = 'External Water (L)<span class="help-tip" title="Lượng nước lã cần châm thêm (Lít)">?</span>';
+                let wrLock = document.querySelector('button[data-target="in-water-ratio"]');
+                if (wrLock) wrLock.style.display = 'none';
             } else {
                 chemPanel.classList.add('hidden');
                 airPressureRow.classList.remove('hidden');
                 document.getElementById('in-water-ratio').disabled = false;
                 if(waterRatioLbl) waterRatioLbl.innerHTML = 'Water Ratio (%)<span class="help-tip" title="Tỉ lệ nước (%)">?</span>';
+                let wrLock = document.querySelector('button[data-target="in-water-ratio"]');
+                if (wrLock) wrLock.style.display = 'inline-block';
             }
             runSimUI();
         }
@@ -784,6 +841,16 @@
             box.innerText = text;
             if (isError) box.classList.add('error');
             else box.classList.remove('error');
+        }
+
+        function toggleLock(btn) {
+            if (btn.innerText === '🔓') {
+                btn.innerText = '🔒';
+                btn.classList.add('locked');
+            } else {
+                btn.innerText = '🔓';
+                btn.classList.remove('locked');
+            }
         }
 
         // --- PHYSICS ENGINE (RK4) ---
@@ -1331,32 +1398,45 @@
             setTimeout(() => {
                 let mode = document.getElementById('in-mode').value;
                 
+                // Dynamic Optimization Bounds based on Unlocked Inputs
+                const allBounds = {
+                    'in-water-ratio': [5, 80],
+                    'in-mass-salt': [1, 200],
+                    'in-vol-vinegar': [100, 2000],
+                    'in-d-nozzle': [5, 25],
+                    'in-l-tube': [0, 1.5],
+                    'in-d-tube': [5, 25],
+                    'in-d-body': [50, 150],
+                    'in-cd': [0.2, 0.8],
+                    'in-m-empty': [0.05, 0.5],
+                    'in-m-ballast': [0, 0.5],
+                    'in-angle': [10, 80]
+                };
+
                 let bounds = {};
-                if (mode === "AIR") {
-                    bounds = {
-                        'in-water-ratio': [5, 80],
-                        'in-d-nozzle': [5, 25],
-                        'in-l-tube': [0, 1.5],
-                        'in-d-tube': [5, 25],
-                        'in-d-body': [50, 150],
-                        'in-cd': [0.2, 0.8],
-                        'in-m-empty': [0.05, 0.5],
-                        'in-m-ballast': [0, 0.5],
-                        'in-angle': [10, 80]
-                    };
-                } else {
-                    bounds = {
-                        'in-mass-salt': [1, 200],
-                        'in-vol-vinegar': [100, 2000],
-                        'in-d-nozzle': [5, 25],
-                        'in-l-tube': [0, 1.5],
-                        'in-d-tube': [5, 25],
-                        'in-d-body': [50, 150],
-                        'in-cd': [0.2, 0.8],
-                        'in-m-empty': [0.05, 0.5],
-                        'in-m-ballast': [0, 0.5],
-                        'in-angle': [10, 80]
-                    };
+                for (let key in allBounds) {
+                    if (mode === "AIR" && (key === 'in-mass-salt' || key === 'in-vol-vinegar')) continue;
+                    if (mode === "CHEM" && key === 'in-water-ratio') continue;
+
+                    let el = document.getElementById(key);
+                    // Check if element is visible (not hidden by mode toggle)
+                    if (el && el.offsetParent !== null) {
+                        let lockBtn = document.querySelector(`button[data-target="${key}"]`);
+                        if (lockBtn && lockBtn.innerText === '🔓') {
+                            bounds[key] = allBounds[key];
+                        }
+                    }
+                }
+
+                const keys = Object.keys(bounds);
+                const num_dims = keys.length;
+
+                if (num_dims === 0) {
+                    setStatus(`PSO ERROR: Please unlock (🔓) at least one parameter to optimize!`, true);
+                    btn.innerText = "> OPTIMIZE RANGE <";
+                    btn.style.backgroundColor = 'transparent';
+                    btn.style.color = 'var(--green)';
+                    return;
                 }
 
                 // Pre-fetch base state to avoid DOM reads during optimization
@@ -1370,8 +1450,6 @@
 
                 const NUM_PARTICLES = 60;
                 const NUM_ITERATIONS = 60;
-                const keys = Object.keys(bounds);
-                const num_dims = keys.length;
 
                 let particles = [];
                 let globalBestPos = [];
@@ -1401,10 +1479,11 @@
                         
                         let state = { ...baseState };
                         for(let j=0; j<num_dims; j++) {
-                            // Constraint: Launch tube dia <= nozzle dia
+                            // Enforce physical constraints dynamically
                             if (keys[j] === 'in-d-tube') {
                                 let nozzleIdx = keys.indexOf('in-d-nozzle');
-                                if (nozzleIdx !== -1 && p.pos[j] > p.pos[nozzleIdx]) p.pos[j] = p.pos[nozzleIdx];
+                                let currentNozzle = (nozzleIdx !== -1) ? p.pos[nozzleIdx] : baseState['in-d-nozzle'];
+                                if (p.pos[j] > currentNozzle) p.pos[j] = currentNozzle;
                             }
                             state[keys[j]] = p.pos[j];
                         }
