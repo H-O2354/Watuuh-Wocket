@@ -496,20 +496,43 @@
                 </div>
             </div>
 
-            <div class="charts-wrapper">
-                <div class="chart-box full-width">
-                    <div class="chart-container">
-                        <canvas id="chart-traj"></canvas>
-                    </div>
+            <div class="chart-controls" style="display: flex; gap: 15px; background: var(--panel-bg); padding: 10px; border: 1px solid var(--border-color); margin-bottom: -5px; z-index: 10; position: relative;">
+                <div class="input-row" style="margin: 0;">
+                    <label style="color:var(--cyan); margin-right: 5px;">X-Axis:</label>
+                    <select id="sel-x-axis" onchange="runSimUI()" style="width: 100px;">
+                        <option value="x">Range (m)</option>
+                        <option value="t">Time (s)</option>
+                    </select>
                 </div>
-                <div class="chart-box">
-                    <div class="chart-container">
-                        <canvas id="chart-dyn"></canvas>
-                    </div>
+                <div class="input-row" style="margin: 0;">
+                    <label style="color:var(--cyan); margin-right: 5px;">Left Y (Cyan):</label>
+                    <select id="sel-y1-axis" onchange="runSimUI()" style="width: 120px;">
+                        <option value="y">Altitude (m)</option>
+                        <option value="v">Velocity (m/s)</option>
+                        <option value="a">Accel. (m/s²)</option>
+                        <option value="T">Thrust (N)</option>
+                        <option value="P">Pressure (PSI)</option>
+                        <option value="m">Mass (kg)</option>
+                    </select>
                 </div>
-                <div class="chart-box">
+                <div class="input-row" style="margin: 0;">
+                    <label style="color:var(--green); margin-right: 5px;">Right Y (Green):</label>
+                    <select id="sel-y2-axis" onchange="runSimUI()" style="width: 120px;">
+                        <option value="none">-- None --</option>
+                        <option value="y">Altitude (m)</option>
+                        <option value="v">Velocity (m/s)</option>
+                        <option value="a">Accel. (m/s²)</option>
+                        <option value="T">Thrust (N)</option>
+                        <option value="P">Pressure (PSI)</option>
+                        <option value="m">Mass (kg)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="charts-wrapper" style="display: flex;">
+                <div class="chart-box full-width" style="flex: 1;">
                     <div class="chart-container">
-                        <canvas id="chart-kin"></canvas>
+                        <canvas id="chart-main"></canvas>
                     </div>
                 </div>
             </div>
@@ -557,10 +580,8 @@
 
             <div class="math-section">
                 <h3>6. Tsiolkovsky Ideal Vacuum Range</h3>
-                <p>Because pressure drops as water is expelled, we use the average exhaust velocity $\bar{v}_e$ derived from adiabatic expansion work $W$:</p>
-                <p>$$ W = \frac{P_i V_i}{\gamma - 1} \left[ 1 - \left(\frac{V_i}{V_f}\right)^{\gamma - 1} \right] - P_{atm}(V_f - V_i) \implies \bar{v}_e = \sqrt{\frac{2W}{m_{liquid}}} $$</p>
-                <p>$$ v_0 = \bar{v}_e \ln\left(1 + \frac{m_{liquid}}{m_{dry}}\right) \implies R_{max} = \frac{v_0^2 \sin(2\theta)}{g} $$</p>
-                <p><em>* Chemical mode applies a 0.4x penalty to $\bar{v}_e$ due to foam (two-phase flow) choking.</em></p>
+                <p>$$ v_0 = v_{e} \ln\left(1 + \frac{m_{liquid}}{m_{dry}}\right) \implies R_{max} = \frac{v_0^2 \sin(2\theta)}{g} $$</p>
+                <p><em>* Chemical mode applies a 0.4x penalty to $v_e$ due to foam (two-phase flow) choking.</em></p>
             </div>
 
         </div>
@@ -623,11 +644,9 @@
                         
                         const text1 = dataset.label;
                         let text2 = '';
-                        if (chart.canvas.id === 'chart-traj') {
-                            text2 = `Range: ${Number(valX).toFixed(2)}m, Alt: ${Number(valY).toFixed(2)}m`;
-                        } else {
-                            text2 = `Time: ${Number(valX).toFixed(2)}s, Value: ${Number(valY).toFixed(2)}`;
-                        }
+                        const xAxisType = document.getElementById('sel-x-axis').value;
+                        const xLabel = xAxisType === 'x' ? 'Range' : 'Time';
+                        text2 = `${xLabel}: ${Number(valX).toFixed(2)}, Value: ${Number(valY).toFixed(2)}`;
                         
                         ctx.font = '12px "Roboto Mono"';
                         const textWidth = Math.max(ctx.measureText(text1).width, ctx.measureText(text2).width);
@@ -665,60 +684,25 @@
         Chart.register(stickyTooltipPlugin);
 
         // --- CHART INSTANCES ---
-        let chartTraj, chartDyn, chartKin;
+        let chartMain;
 
         function initCharts() {
             Chart.defaults.color = '#728b9c';
             Chart.defaults.font.family = "'Roboto Mono', monospace";
             Chart.defaults.borderColor = '#1a2c42';
 
-            const commonOptions = {
-                responsive: true, maintainAspectRatio: false,
-                animation: false,
-                interaction: { mode: 'index', intersect: false },
-                plugins: { legend: { labels: { font: { size: 11 } } } }
-            };
-
-            // Trajectory
-            chartTraj = new Chart(document.getElementById('chart-traj'), {
+            chartMain = new Chart(document.getElementById('chart-main'), {
                 type: 'scatter',
                 data: { datasets: [] },
                 options: {
-                    ...commonOptions,
-                    interaction: { mode: 'nearest', axis: 'xy', intersect: false },
+                    responsive: true, maintainAspectRatio: false,
+                    animation: false,
+                    interaction: { mode: 'nearest', axis: 'x', intersect: false },
+                    plugins: { legend: { labels: { font: { size: 11 } } } },
                     scales: {
-                        x: { type: 'linear', position: 'bottom', title: {display: true, text: 'Range (m)', color: '#00f3ff'}, grid: {color: '#1a2c42'} },
-                        y: { title: {display: true, text: 'Altitude (m)', color: '#00f3ff'}, grid: {color: '#1a2c42'} }
-                    }
-                }
-            });
-
-            // Dynamics
-            chartDyn = new Chart(document.getElementById('chart-dyn'), {
-                type: 'line',
-                data: { datasets: [] },
-                options: {
-                    ...commonOptions,
-                    elements: { point: { radius: 0 }, line: { borderWidth: 2 } },
-                    scales: {
-                        x: { type: 'linear', title: {display: true, text: 'Time (s)'} },
-                        yT: { type: 'linear', position: 'left', title: {display: true, text: 'Thrust (N)'}, grid: {display: false} },
-                        yP: { type: 'linear', position: 'right', title: {display: true, text: 'Pressure (PSI)'}, grid: {display: false} }
-                    }
-                }
-            });
-
-            // Kinematics
-            chartKin = new Chart(document.getElementById('chart-kin'), {
-                type: 'line',
-                data: { datasets: [] },
-                options: {
-                    ...commonOptions,
-                    elements: { point: { radius: 0 }, line: { borderWidth: 2 } },
-                    scales: {
-                        x: { type: 'linear', title: {display: true, text: 'Time (s)'} },
-                        yA: { type: 'linear', position: 'left', title: {display: true, text: 'Altitude (m)'}, grid: {display: false} },
-                        yV: { type: 'linear', position: 'right', title: {display: true, text: 'Velocity (m/s)'}, grid: {display: false} }
+                        x: { type: 'linear', position: 'bottom', title: {display: true, text: 'X-Axis', color: '#00f3ff'}, grid: {color: '#1a2c42'} },
+                        y1: { type: 'linear', position: 'left', title: {display: true, text: 'Y1', color: '#00f3ff'}, grid: {color: '#1a2c42'} },
+                        y2: { type: 'linear', position: 'right', title: {display: false}, grid: {display: false}, display: false }
                     }
                 }
             });
@@ -796,30 +780,38 @@
                     dP_dt = -gamma * (P / V_air) * dV_air_dt;
                     
                 } else if (P > P_atm * 1.01) {
-                    // Gas thrust phase (Choked Flow)
-                    let pratio = P_atm / P;
-                    let choke_limit = 0.455;
-                    let mdot_gas, v_gas;
-                    
-                    if (pratio < choke_limit) { // Choked
-                        v_gas = Math.sqrt(gamma * R_spec * params.T_env);
-                        let coeff = Math.sqrt(gamma / (R_spec * params.T_env)) * Math.pow(2 / (gamma + 1), (gamma + 1) / (2 * (gamma - 1)));
-                        mdot_gas = params.A_e * P * coeff;
-                        Thrust = mdot_gas * v_gas + (P * choke_limit - P_atm) * params.A_e;
-                    } else { // Subsonic
-                        let mach_sq = (2 / (gamma - 1)) * (Math.pow(1 / pratio, (gamma - 1) / gamma) - 1);
-                        mach_sq = Math.max(0, mach_sq);
-                        v_gas = Math.sqrt(mach_sq * gamma * R_spec * params.T_env);
-                        let T_exit = params.T_env / (1 + (gamma - 1) / 2 * mach_sq);
-                        let rho_exit = P_atm / (R_spec * T_exit);
-                        mdot_gas = params.A_e * rho_exit * v_gas;
-                        Thrust = mdot_gas * v_gas;
+                    if (params.is_chem) {
+                        // In chemical mode (foam), gas escapes with the foam.
+                        // There is no distinct pure gas thrust phase.
+                        dP_dt = -P; // rapidly decay
+                        Thrust = 0;
+                        dm_dt = 0;
+                    } else {
+                        // Gas thrust phase (Choked Flow)
+                        let pratio = P_atm / P;
+                        let choke_limit = 0.455;
+                        let mdot_gas, v_gas;
+                        
+                        if (pratio < choke_limit) { // Choked
+                            v_gas = Math.sqrt(gamma * R_spec * params.T_env);
+                            let coeff = Math.sqrt(gamma / (R_spec * params.T_env)) * Math.pow(2 / (gamma + 1), (gamma + 1) / (2 * (gamma - 1)));
+                            mdot_gas = params.A_e * P * coeff;
+                            Thrust = mdot_gas * v_gas + (P * choke_limit - P_atm) * params.A_e;
+                        } else { // Subsonic
+                            let mach_sq = (2 / (gamma - 1)) * (Math.pow(1 / pratio, (gamma - 1) / gamma) - 1);
+                            mach_sq = Math.max(0, mach_sq);
+                            v_gas = Math.sqrt(mach_sq * gamma * R_spec * params.T_env);
+                            let T_exit = params.T_env / (1 + (gamma - 1) / 2 * mach_sq);
+                            let rho_exit = P_atm / (R_spec * T_exit);
+                            mdot_gas = params.A_e * rho_exit * v_gas;
+                            Thrust = mdot_gas * v_gas;
+                        }
+                        
+                        let rho_chamber = P / (R_spec * params.T_env);
+                        let dV_gas = mdot_gas / rho_chamber;
+                        dP_dt = -gamma * (P / params.V_bottle) * dV_gas;
+                        dm_dt = 0; // Gas mass is neglected in structural mass to save computation
                     }
-                    
-                    let rho_chamber = P / (R_spec * params.T_env);
-                    let dV_gas = mdot_gas / rho_chamber;
-                    dP_dt = -gamma * (P / params.V_bottle) * dV_gas;
-                    dm_dt = 0; // Gas mass is neglected in structural mass to save computation
                 } else {
                     dP_dt = -P; // Rapidly decay to 0 differential
                     Thrust = 0;
@@ -840,6 +832,9 @@
                     ay = (Thrust * sin_th - Fd * sin_th) / m_total - g;
                 }
                 
+                params.last_ax = ax;
+                params.last_ay = ay;
+                
                 return [vx, vy, ax, ay, dm_dt, dP_dt];
             },
 
@@ -852,6 +847,8 @@
                     v: new Float64Array(MAX_STEPS),
                     T: new Float64Array(MAX_STEPS),
                     P: new Float64Array(MAX_STEPS),
+                    m: new Float64Array(MAX_STEPS),
+                    a: new Float64Array(MAX_STEPS),
                     ptr: 0,
                     apogee: 0,
                     max_vel: 0,
@@ -879,6 +876,8 @@
                         out.v[out.ptr] = Math.sqrt(Y[2]*Y[2] + Y[3]*Y[3]);
                         out.T[out.ptr] = params.last_Thrust;
                         out.P[out.ptr] = (Y[5] - P_atm) / 6894.76; // PSI Gauge
+                        out.m[out.ptr] = params.m_dry + Math.max(0, Y[4]);
+                        out.a[out.ptr] = Math.sqrt(params.last_ax*params.last_ax + params.last_ay*params.last_ay);
                         
                         if (Y[1] > out.apogee) out.apogee = Y[1];
                         if (out.v[out.ptr] > out.max_vel) out.max_vel = out.v[out.ptr];
@@ -1031,25 +1030,11 @@
 
             const res = Engine.simulate(params);
 
-            // Calculate Tsiolkovsky Ideal trajectory with Average Exhaust Velocity
-            let V_air_i = params.V_bottle - params.V_liquid;
-            let V_air_f = params.V_bottle;
-            let P_i = params.P_init;
-            let ideal_range = 0;
-            let v0_ideal = 0;
-            
-            if (V_air_i > 0 && params.m_water_init > 0) {
-                // Total work done by expanding gas
-                let W = (P_i * V_air_i) / (gamma - 1) * (1 - Math.pow(V_air_i / V_air_f, gamma - 1)) - P_atm * (V_air_f - V_air_i);
-                if (W < 0) W = 0;
-                
-                // Average exhaust velocity (energy equivalence)
-                let ve_avg = Math.sqrt(2 * W / params.m_water_init);
-                if (params.is_chem) ve_avg *= 0.4; // Apply chemical penalty
-                
-                v0_ideal = ve_avg * Math.log(1 + params.m_water_init / params.m_dry);
-                ideal_range = (v0_ideal * v0_ideal * Math.sin(2 * params.theta0)) / g;
-            }
+            // Calculate Tsiolkovsky Ideal trajectory
+            let u_eq = Math.sqrt(2 * (params.P_init - P_atm) / params.rho_fluid);
+            if (params.is_chem) u_eq *= 0.4;
+            let v0_ideal = u_eq * Math.log(1 + params.m_water_init / params.m_dry);
+            let ideal_range = (v0_ideal * v0_ideal * Math.sin(2 * params.theta0)) / g;
 
             if (!silent) {
                 updateUI(res, ideal_range, v0_ideal, params);
@@ -1067,112 +1052,119 @@
             document.getElementById('val-flight-time').innerText = res.t[res.ptr-1].toFixed(2) + ' s';
             document.getElementById('val-burn-time').innerText = res.burn_time.toFixed(3) + ' s';
 
-            // Prepare Data arrays
-            let t_data = Array.from(res.t.slice(0, res.ptr));
-            let x_data = Array.from(res.x.slice(0, res.ptr));
-            let y_data = Array.from(res.y.slice(0, res.ptr));
-            
-            let traj_points = [];
-            for(let i=0; i<res.ptr; i++) {
-                traj_points.push({x: res.x[i], y: res.y[i]});
-            }
+            // Axis selections
+            const selX = document.getElementById('sel-x-axis');
+            const selY1 = document.getElementById('sel-y1-axis');
+            const selY2 = document.getElementById('sel-y2-axis');
+            const xKey = selX.value;
+            const y1Key = selY1.value;
+            const y2Key = selY2.value;
 
-            // Ideal Trajectory points
-            let ideal_points = [];
-            let t_flight_ideal = (2 * v0_ideal * Math.sin(params.theta0)) / g;
-            for(let i=0; i<=50; i++) {
-                let ti = (i/50) * t_flight_ideal;
-                let xi = v0_ideal * Math.cos(params.theta0) * ti;
-                let yi = v0_ideal * Math.sin(params.theta0) * ti - 0.5 * g * ti * ti;
-                if(yi >= 0) ideal_points.push({x: xi, y: yi});
-            }
+            const labels = {
+                'x': 'Range (m)', 't': 'Time (s)', 'y': 'Altitude (m)', 
+                'v': 'Velocity (m/s)', 'a': 'Acceleration (m/s²)', 
+                'T': 'Thrust (N)', 'P': 'Pressure (PSI)', 'm': 'Mass (kg)'
+            };
 
-            let apogee_point = {x: 0, y: 0};
-            for(let p of traj_points) {
-                if (p.y > apogee_point.y) apogee_point = p;
-            }
-            let touchdown_point = traj_points[traj_points.length - 1] || {x:0, y:0};
+            // Build dataset generator
+            const buildData = (yKey) => {
+                let pts = [];
+                for(let i=0; i<res.ptr; i++) {
+                    pts.push({x: res[xKey][i], y: res[yKey][i]});
+                }
+                return pts;
+            };
 
-            // Update Trajectory Chart
-            chartTraj.data.datasets = [
-                {
-                    label: 'Actual Trajectory (RK4)',
-                    data: traj_points,
-                    backgroundColor: '#00f3ff',
-                    showLine: true,
-                    borderColor: '#00f3ff',
-                    borderWidth: 2,
-                    pointRadius: 0
-                },
-                {
+            let datasets = [];
+
+            // Add Y1 Dataset
+            datasets.push({
+                label: labels[y1Key] + ' (Y1)',
+                data: buildData(y1Key),
+                borderColor: '#00f3ff',
+                backgroundColor: '#00f3ff',
+                showLine: true,
+                borderWidth: 2,
+                pointRadius: 0,
+                yAxisID: 'y1'
+            });
+
+            // Special Case: Trajectory (X: Range, Y1/Y2: Altitude)
+            if (xKey === 'x' && (y1Key === 'y' || y2Key === 'y')) {
+                let ideal_points = [];
+                let t_flight_ideal = (2 * v0_ideal * Math.sin(params.theta0)) / g;
+                for(let i=0; i<=50; i++) {
+                    let ti = (i/50) * t_flight_ideal;
+                    let xi = v0_ideal * Math.cos(params.theta0) * ti;
+                    let yi = v0_ideal * Math.sin(params.theta0) * ti - 0.5 * g * ti * ti;
+                    if(yi >= 0) ideal_points.push({x: xi, y: yi});
+                }
+                
+                let actual_pts = buildData('y');
+                let apogee_point = {x: 0, y: 0};
+                for(let p of actual_pts) {
+                    if (p.y > apogee_point.y) apogee_point = p;
+                }
+                let touchdown_point = actual_pts[actual_pts.length - 1] || {x:0, y:0};
+
+                datasets.push({
                     label: 'Ideal Vacuum (Tsiolkovsky)',
                     data: ideal_points,
                     backgroundColor: '#728b9c',
-                    showLine: true,
                     borderColor: '#728b9c',
+                    showLine: true,
                     borderWidth: 1.5,
                     borderDash: [5, 5],
-                    pointRadius: 0
-                },
-                {
-                    label: 'Apogee (Điểm cao nhất)',
+                    pointRadius: 0,
+                    yAxisID: y1Key === 'y' ? 'y1' : 'y2'
+                });
+                datasets.push({
+                    label: 'Apogee',
                     data: [apogee_point],
                     backgroundColor: '#ff003c',
                     borderColor: '#ff003c',
                     pointRadius: 6,
                     pointStyle: 'triangle',
-                    showLine: false
-                },
-                {
-                    label: 'Touchdown (Đáp đất)',
+                    showLine: false,
+                    yAxisID: y1Key === 'y' ? 'y1' : 'y2'
+                });
+                datasets.push({
+                    label: 'Touchdown',
                     data: [touchdown_point],
                     backgroundColor: '#39ff14',
                     borderColor: '#39ff14',
                     pointRadius: 6,
                     pointStyle: 'crossRot',
-                    showLine: false
-                }
-            ];
-            chartTraj.update();
+                    showLine: false,
+                    yAxisID: y1Key === 'y' ? 'y1' : 'y2'
+                });
+            }
 
-            // Update Dynamics Chart
-            chartDyn.data.labels = t_data;
-            chartDyn.data.datasets = [
-                {
-                    label: 'Thrust (N)',
-                    data: Array.from(res.T.slice(0, res.ptr)),
-                    borderColor: '#00f3ff',
-                    yAxisID: 'yT'
-                },
-                {
-                    label: 'Pressure (PSI)',
-                    data: Array.from(res.P.slice(0, res.ptr)),
+            // Add Y2 Dataset
+            if (y2Key !== 'none') {
+                datasets.push({
+                    label: labels[y2Key] + ' (Y2)',
+                    data: buildData(y2Key),
                     borderColor: '#39ff14',
-                    yAxisID: 'yP'
-                }
-            ];
-            // Zoom X-axis to burn time for dynamics
-            chartDyn.options.scales.x.max = res.burn_time * 1.5;
-            chartDyn.update();
+                    backgroundColor: '#39ff14',
+                    showLine: true,
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    yAxisID: 'y2'
+                });
+            }
 
-            // Update Kinematics Chart
-            chartKin.data.labels = t_data;
-            chartKin.data.datasets = [
-                {
-                    label: 'Altitude (m)',
-                    data: y_data,
-                    borderColor: '#00f3ff',
-                    yAxisID: 'yA'
-                },
-                {
-                    label: 'Velocity (m/s)',
-                    data: Array.from(res.v.slice(0, res.ptr)),
-                    borderColor: '#39ff14',
-                    yAxisID: 'yV'
-                }
-            ];
-            chartKin.options.scales.x.max = res.t[res.ptr-1];
-            chartKin.update();
+            chartMain.options.scales.x.title.text = labels[xKey];
+            chartMain.options.scales.y1.title.text = labels[y1Key];
+            chartMain.options.scales.y2.display = y2Key !== 'none';
+            if(y2Key !== 'none') chartMain.options.scales.y2.title.text = labels[y2Key];
+
+            // Set chart limits
+            let max_x = Math.max(...Array.from(res[xKey].slice(0, res.ptr)));
+            chartMain.options.scales.x.max = max_x * 1.05;
+
+            chartMain.data.datasets = datasets;
+            chartMain.update();
         }
 
         function clearCharts() {
@@ -1181,9 +1173,10 @@
             document.getElementById('val-apogee').innerText = '0.00 m';
             document.getElementById('val-max-v').innerText = '0.00 m/s';
             
-            chartTraj.data.datasets = []; chartTraj.update();
-            chartDyn.data.datasets = []; chartDyn.update();
-            chartKin.data.datasets = []; chartKin.update();
+            if (chartMain) {
+                chartMain.data.datasets = []; 
+                chartMain.update();
+            }
         }
 
         function optimizeRange() {
