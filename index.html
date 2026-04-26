@@ -2223,8 +2223,9 @@ Respond with ONLY a valid JSON object. No markdown, no explanation outside JSON.
                 let baseState = { 'in-mode': mode };
                 const allInputIds = ['in-v-bottle', 'in-water-ratio', 'in-pressure', 'in-salt-type', 'in-mass-salt', 'in-vol-vinegar', 'in-acid-conc', 'in-gas-eff', 'in-popoff', 'in-burst', 'in-d-nozzle', 'in-l-tube', 'in-d-tube', 'in-d-body', 'in-cd', 'in-m-empty', 'in-m-ballast', 'in-angle', 'in-temp', 'in-env'];
                 for (let id of allInputIds) {
-                    if (document.getElementById(id)) {
-                        baseState[id] = parseFloat(document.getElementById(id).value);
+                    const el = document.getElementById(id);
+                    if (el) {
+                        baseState[id] = parseFloat(el.value);
                     }
                 }
 
