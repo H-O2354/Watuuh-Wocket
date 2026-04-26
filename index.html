@@ -1911,7 +1911,7 @@
                 } else if (e.message.includes('429') || e.message.includes('rate')) {
                     hint = '\n→ Rate limit. Đợi 1-2 phút rồi thử lại.';
                 } else if (e.message.includes('Provider returned error')) {
-                    hint = '\n→ Model tạm thời quá tải (free tier). Đợi 30s rồi thử lại.';
+                    hint = '\n→ Lỗi từ Server API. Thử lại sau.';
                 }
                 errEl.innerText = 'Lỗi: ' + e.message + hint;
             }
@@ -2125,12 +2125,12 @@ Respond with EXACTLY ONE valid JSON object in the following format:
 
                     if (!responseParams) throw new Error('Invalid AI response format');
 
-                    // Preserve assistant response with reasoning_details
-                    messages.push({
+                    // Preserve assistant response WITHOUT reasoning_details to prevent OpenRouter 500 Provider errors on Nemotron
+                    let asstMsg = {
                         role: 'assistant',
-                        content: response.content,
-                        reasoning_details: response.reasoning_details
-                    });
+                        content: response.content
+                    };
+                    messages.push(asstMsg);
 
                     // Build state
                     let state = { 'in-mode': mode };
