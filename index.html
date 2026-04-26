@@ -2096,7 +2096,9 @@ Respond with ONLY a valid JSON object. No markdown, no explanation outside JSON.
             if (!baseline.params.exploded) {
                 bestScore = baseline.range;
                 progText.innerText = `Baseline range: ${bestScore.toFixed(2)}m`;
-                logEl.innerHTML += `<div>Baseline: ${bestScore.toFixed(2)}m</div>`;
+                const baselineEntry = document.createElement('div');
+                baselineEntry.textContent = `Baseline: ${bestScore.toFixed(2)}m`;
+                logEl.appendChild(baselineEntry);
             }
 
             try {
@@ -2153,7 +2155,11 @@ Respond with ONLY a valid JSON object. No markdown, no explanation outside JSON.
                         bestParams = { ...state };
                     }
 
-                    logEl.innerHTML += `<div class="${isBest ? 'best' : ''}">Round ${round + 1}: ${range.toFixed(2)}m ${isBest ? '★ BEST' : ''} — ${reasoning.substring(0, 80)}</div>`;
+                    const entry = document.createElement('div');
+                    if (isBest) entry.className = 'best';
+                    entry.textContent = `Round ${round + 1}: ${range.toFixed(2)}m ${isBest ? '★ BEST' : ''} — ${reasoning.substring(0, 80)}`;
+                    logEl.appendChild(entry);
+
                     logEl.scrollTop = logEl.scrollHeight;
                     progText.innerText = `AI Round ${round + 1}/${MAX_ROUNDS}: Range=${range.toFixed(2)}m | Best=${bestScore.toFixed(2)}m`;
                 }
