@@ -1050,8 +1050,8 @@
             <h2>🔑 OpenRouter API Key</h2>
             <p>
                 Nhập API key từ <a href="https://openrouter.ai/keys" target="_blank"
-                    style="color:var(--cyan);">OpenRouter</a> để sử dụng <strong style="color:var(--green);">Gemma 4
-                    31B</strong> làm AI Optimizer (miễn phí).<br>
+                    style="color:var(--cyan);">OpenRouter</a> để sử dụng <strong style="color:var(--green);">Nemotron 3 Super
+                    120B</strong> làm AI Optimizer (miễn phí).<br>
                 Key chỉ lưu trong phiên làm việc hiện tại, không được lưu trữ vĩnh viễn.
             </p>
             <input type="password" id="api-key-input" class="api-key-input" placeholder="sk-or-v1-..."
@@ -1842,7 +1842,7 @@
         }
 
         // --- API KEY MANAGEMENT ---
-        let _gemmaApiKey = null;
+        let _nemotronApiKey = null;
         let _thinkingEnabled = true;
 
         function showApiModal() {
@@ -1870,7 +1870,7 @@
                         'Authorization': 'Bearer ' + key
                     },
                     body: JSON.stringify({
-                        model: 'google/gemma-4-31b-it:free',
+                        model: 'nvidia/nemotron-3-super-120b-a12b:free',
                         messages: [{ role: 'user', content: 'Say OK' }]
                     })
                 });
@@ -1891,13 +1891,13 @@
                 }
 
                 // Success!
-                _gemmaApiKey = key;
+                _nemotronApiKey = key;
                 _thinkingEnabled = document.getElementById('api-thinking').checked;
                 errEl.innerText = '';
                 errEl.style.color = 'var(--red)';
                 document.getElementById('api-modal').classList.remove('active');
                 document.getElementById('conn-dot').classList.add('connected');
-                let label = 'Gemma 4 31B';
+                let label = 'Nemotron 3 Super 120B';
                 if (_thinkingEnabled) label += ' 🧠';
                 document.getElementById('conn-label').innerText = 'AI: ' + label;
             } catch (e) {
@@ -2023,9 +2023,9 @@ Respond with ONLY a valid JSON object. No markdown, no explanation outside JSON.
 }`;
         }
 
-        async function callGemma(messages) {
+        async function callNemotron(messages) {
             let body = {
-                model: 'google/gemma-4-31b-it:free',
+                model: 'nvidia/nemotron-3-super-120b-a12b:free',
                 messages: messages
             };
             if (_thinkingEnabled) {
@@ -2036,7 +2036,7 @@ Respond with ONLY a valid JSON object. No markdown, no explanation outside JSON.
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + _gemmaApiKey
+                    'Authorization': 'Bearer ' + _nemotronApiKey
                 },
                 body: JSON.stringify(body)
             });
@@ -2062,7 +2062,7 @@ Respond with ONLY a valid JSON object. No markdown, no explanation outside JSON.
         }
 
         async function aiOptimize() {
-            if (!_gemmaApiKey) { showApiModal(); return; }
+            if (!_nemotronApiKey) { showApiModal(); return; }
             const btn = document.getElementById('btn-optimize');
             const prog = document.getElementById('ai-progress');
             const progText = document.getElementById('ai-progress-text');
@@ -2103,7 +2103,7 @@ Respond with ONLY a valid JSON object. No markdown, no explanation outside JSON.
 
             try {
                 for (let round = 0; round < MAX_ROUNDS; round++) {
-                    progText.innerText = `AI Round ${round + 1}/${MAX_ROUNDS}: Querying Gemma 4 31B...`;
+                    progText.innerText = `AI Round ${round + 1}/${MAX_ROUNDS}: Querying Nemotron 3 Super 120B...`;
                     progFill.style.width = `${((round) / MAX_ROUNDS) * 100}%`;
 
                     const prompt = buildPrompt(unlocked, locked, mode, history);
@@ -2111,7 +2111,7 @@ Respond with ONLY a valid JSON object. No markdown, no explanation outside JSON.
                     // Add user prompt to messages array
                     messages.push({ role: 'user', content: prompt });
 
-                    const response = await callGemma(messages);
+                    const response = await callNemotron(messages);
 
                     const responseParams = response.parsed.params;
                     const responseReasoning = response.parsed.reasoning;
