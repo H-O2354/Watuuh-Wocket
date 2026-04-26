@@ -1057,7 +1057,8 @@
             <input type="password" id="api-key-input" class="api-key-input" placeholder="sk-or-v1-..."
                 autocomplete="off" spellcheck="false">
             <div class="api-key-error" id="api-key-error"></div>
-            <div
+
+                        <div
                 style="margin-top:12px; display:flex; align-items:center; gap:10px; padding:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.3);">
                 <label class="toggle-switch">
                     <input type="checkbox" id="api-thinking" checked>
@@ -1845,6 +1846,7 @@
         let _nemotronApiKey = null;
         let _thinkingEnabled = true;
 
+
         function showApiModal() {
             document.getElementById('api-modal').classList.add('active');
             document.getElementById('api-key-input').focus();
@@ -1893,12 +1895,14 @@
                 // Success!
                 _nemotronApiKey = key;
                 _thinkingEnabled = document.getElementById('api-thinking').checked;
+
                 errEl.innerText = '';
                 errEl.style.color = 'var(--red)';
                 document.getElementById('api-modal').classList.remove('active');
                 document.getElementById('conn-dot').classList.add('connected');
                 let label = 'Nemotron 3 Super 120B';
                 if (_thinkingEnabled) label += ' 🧠';
+
                 document.getElementById('conn-label').innerText = 'AI: ' + label;
             } catch (e) {
                 errEl.style.color = 'var(--red)';
@@ -2034,6 +2038,7 @@ Respond with EXACTLY ONE valid JSON object in the following format:
                 body.reasoning = { enabled: true };
             }
 
+
             const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                 method: 'POST',
                 headers: {
@@ -2054,7 +2059,7 @@ Respond with EXACTLY ONE valid JSON object in the following format:
 
             let text = choice.content || '';
             // Make JSON extraction robust against conversational filler
-            let jsonMatch = text.match(/\{([\s\S]*)\}/);
+            let jsonMatch = text.match(/\{([\s\S]*?)\}\s*(?=$)/) || text.match(/\{([\s\S]*)\}/);
             if (jsonMatch) {
                 text = jsonMatch[0];
             } else {
@@ -2063,7 +2068,6 @@ Respond with EXACTLY ONE valid JSON object in the following format:
 
             return {
                 content: text,
-                reasoning_details: choice.reasoning_details,
                 parsed: JSON.parse(text)
             };
         }
