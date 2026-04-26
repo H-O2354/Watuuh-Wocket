@@ -1911,7 +1911,7 @@
                 } else if (e.message.includes('429') || e.message.includes('rate')) {
                     hint = '\n→ Rate limit. Đợi 1-2 phút rồi thử lại.';
                 } else if (e.message.includes('Provider returned error')) {
-                    hint = '\n→ Model tạm thời quá tải (free tier). Đợi 30s rồi thử lại.';
+                    hint = '\n→ Lỗi từ Server API. Thử lại sau.';
                 }
                 errEl.innerText = 'Lỗi: ' + e.message + hint;
             }
@@ -2015,11 +2015,13 @@ ${lockedList}
 ## UNLOCKED parameters (you MUST suggest new values for ALL of these):
 ${paramList}
 ${historyText}
-# OUTPUT FORMAT
-Respond with ONLY a valid JSON object. No markdown, no explanation outside JSON.
+# OUTPUT FORMAT & EXECUTION DIRECTIVE
+You are an EXECUTION BOT. You must NOT include any conversational filler, thinking processes, or explanations outside of the JSON block. Your entire response will be parsed directly by `JSON.parse()`. If you output anything other than the JSON object, the system will crash.
+
+Respond with EXACTLY ONE valid JSON object in the following format:
 {
   "params": { <key>: <value> for EVERY unlocked parameter },
-  "reasoning": "1-2 sentence explanation of your optimization strategy for this round"
+  "reasoning": "A concise, 1-2 sentence explanation of your optimization strategy for this execution step."
 }`;
         }
 
@@ -2051,8 +2053,13 @@ Respond with ONLY a valid JSON object. No markdown, no explanation outside JSON.
             if (!choice) throw new Error('No message returned from API');
 
             let text = choice.content || '';
-            // Clean potential markdown fences from response
-            text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+            // Make JSON extraction robust against conversational filler
+            let jsonMatch = text.match(/\{([\s\S]*)\}/);
+            if (jsonMatch) {
+                text = jsonMatch[0];
+            } else {
+                text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+            }
 
             return {
                 content: text,
@@ -2118,12 +2125,12 @@ Respond with ONLY a valid JSON object. No markdown, no explanation outside JSON.
 
                     if (!responseParams) throw new Error('Invalid AI response format');
 
-                    // Preserve assistant response with reasoning_details
-                    messages.push({
+                    // Preserve assistant response WITHOUT reasoning_details to prevent OpenRouter 500 Provider errors on Nemotron
+                    let asstMsg = {
                         role: 'assistant',
-                        content: response.content,
-                        reasoning_details: response.reasoning_details
-                    });
+                        content: response.content
+                    };
+                    messages.push(asstMsg);
 
                     // Build state
                     let state = { 'in-mode': mode };
