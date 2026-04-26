@@ -2015,11 +2015,13 @@ ${lockedList}
 ## UNLOCKED parameters (you MUST suggest new values for ALL of these):
 ${paramList}
 ${historyText}
-# OUTPUT FORMAT
-Respond with ONLY a valid JSON object. No markdown, no explanation outside JSON.
+# OUTPUT FORMAT & EXECUTION DIRECTIVE
+You are an EXECUTION BOT. You must NOT include any conversational filler, thinking processes, or explanations outside of the JSON block. Your entire response will be parsed directly by `JSON.parse()`. If you output anything other than the JSON object, the system will crash.
+
+Respond with EXACTLY ONE valid JSON object in the following format:
 {
   "params": { <key>: <value> for EVERY unlocked parameter },
-  "reasoning": "1-2 sentence explanation of your optimization strategy for this round"
+  "reasoning": "A concise, 1-2 sentence explanation of your optimization strategy for this execution step."
 }`;
         }
 
