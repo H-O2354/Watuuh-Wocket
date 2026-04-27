@@ -941,6 +941,14 @@
                         <option value="T">Thrust (N)</option>
                         <option value="P">Pressure (PSI)</option>
                         <option value="m">Mass (kg)</option>
+                        <option value="Fd">Drag (N)</option>
+                        <option value="mdot">Mass Flow Rate (kg/s)</option>
+                        <option value="temp">Int. Temp (C)</option>
+                        <option value="com">Center of Mass (m)</option>
+                        <option value="cop">Center of Pressure (m)</option>
+                        <option value="sm">Static Margin (cal)</option>
+                        <option value="dt">Time-step (s)</option>
+                        <option value="dV">Vol Exp. (L)</option>
                     </select>
                 </div>
                 <div class="input-row" style="margin: 0;">
@@ -953,6 +961,14 @@
                         <option value="T">Thrust (N)</option>
                         <option value="P">Pressure (PSI)</option>
                         <option value="m">Mass (kg)</option>
+                        <option value="Fd">Drag (N)</option>
+                        <option value="mdot">Mass Flow Rate (kg/s)</option>
+                        <option value="temp">Int. Temp (C)</option>
+                        <option value="com">Center of Mass (m)</option>
+                        <option value="cop">Center of Pressure (m)</option>
+                        <option value="sm">Static Margin (cal)</option>
+                        <option value="dt">Time-step (s)</option>
+                        <option value="dV">Vol Exp. (L)</option>
                     </select>
                 </div>
                 <div class="input-row" style="margin: 0; margin-left: auto;">
@@ -980,7 +996,7 @@
                 onclick="document.getElementById('eq-modal').classList.remove('active')">&times;</button>
             <h2
                 style="color:var(--cyan); margin-bottom: 20px; text-transform: uppercase; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
-                Runge-Kutta 4 (RK4) Mathematical Engine</h2>
+                Physics Models & Mathematical Engine (RK45)</h2>
 
             <div class="math-section">
                 <h3>1. Thrust System (Bernoulli & Newton)</h3>
@@ -1262,7 +1278,7 @@
             }
         }
 
-        // --- PHYSICS ENGINE (RK4) ---
+        // --- PHYSICS ENGINE (RK45) ---
         const Engine = {
             compute_derivatives: function (t, Y, params) {
                 // Y = [x, y, vx, vy, m_water, P_curr]
@@ -1270,6 +1286,7 @@
 
                 let v_mag = Math.sqrt(vx * vx + vy * vy);
                 let Fd = 0.5 * params.rho_a * params.Cd * params.A_ref * v_mag * v_mag;
+                params.last_Fd = Fd;
 
                 let cos_th = v_mag === 0 ? Math.cos(params.theta0) : vx / v_mag;
                 let sin_th = v_mag === 0 ? Math.sin(params.theta0) : vy / v_mag;
@@ -1279,34 +1296,70 @@
                 let Thrust = 0;
                 let dm_dt = 0;
                 let dP_dt = 0;
+                let mdot_out = 0;
 
                 let m_total = params.m_dry + Math.max(0, m_w);
 
+                // Track previous acceleration to use for non-inertial Bernoulli in next step
+                let prev_a = params.last_ax !== undefined ? Math.sqrt(params.last_ax*params.last_ax + params.last_ay*params.last_ay) : 0;
+                let a_longitudinal = prev_a * Math.sin(params.theta0); // simplify by projecting full acceleration
+
+                // Elastic Vessel Volume Expansion (PET)
+                // dV = (P_gauge * r * V_initial) / (t * E)
+                // approximate elasticity mapping
+                let P_eff = Math.max(0, P - P_atm);
+                let dV_elastic = params.V_bottle * (P_eff / (3200e6)); // very simplified PET modulus expansion
+                let V_bottle_actual = params.V_bottle + dV_elastic;
+                params.last_dV = dV_elastic;
+
                 if (m_w > 0) {
                     // Water or Tube phase
-                    let P_eff = Math.max(0, P - P_atm);
                     let dV_air_dt = 0;
+
+                    let T_chamber = params.T_env * Math.pow(P / params.P_init, (gamma - 1) / gamma);
+                    params.last_temp = T_chamber;
 
                     if (dist < params.L_tube) {
                         // Tube phase: works like a piston
                         Thrust = P_eff * params.A_tube;
                         if (params.is_chem) Thrust *= 0.5; // Foam compressability loss
-                        Thrust *= 0.9; // Friction and leakage loss
+                        Thrust *= 0.9; // Dynamic friction and leakage loss model
                         dV_air_dt = params.A_tube * v_mag;
                         dm_dt = 0;
+                        mdot_out = 0;
                     } else {
-                        // Water thrust phase
-                        let ve = Math.sqrt(2 * P_eff / params.rho_fluid);
+                        // Water thrust phase (Transient Bernoulli)
+                        // Effective head includes longitudinal acceleration
+                        let V_water = m_w / params.rho_fluid;
+                        let H = V_water / params.A_ref; // Approximate head
+                        let a_eff = g + a_longitudinal;
+
+                        let ve_sq = 2 * (a_eff * H + P_eff / params.rho_fluid);
+                        let ve = ve_sq > 0 ? Math.sqrt(ve_sq) : 0;
+
                         if (params.is_chem) ve *= 0.4; // Foam choking (two-phase flow) limits exhaust velocity
-                        let mdot = params.rho_fluid * params.A_e * ve;
+
+                        // Hemodynamic variable Cd approximation based on Reynolds/swirl
+                        let Cd = 0.95 - (0.05 * (v_mag / 100)); // slightly decreases as speed increases
+                        let mdot = Cd * params.rho_fluid * params.A_e * ve;
+
                         Thrust = mdot * ve;
                         dV_air_dt = params.A_e * ve;
                         dm_dt = -mdot;
+                        mdot_out = mdot;
                     }
 
-                    let V_air = params.V_bottle - (m_w / params.rho_fluid);
+                    let V_air = V_bottle_actual - (m_w / params.rho_fluid);
                     if (V_air <= 0.0001) V_air = 0.0001;
-                    dP_dt = -gamma * (P / V_air) * dV_air_dt;
+
+                    // Modulate gamma based on saturation / condensation
+                    // Wet air gamma is lower due to latent heat
+                    let current_gamma = gamma;
+                    if(T_chamber < 273.15) {
+                         current_gamma = 1.34; // moderate to 1.34 if below freezing due to ice latent heat
+                    }
+
+                    dP_dt = -current_gamma * (P / V_air) * dV_air_dt;
 
                 } else if (P > P_atm * 1.01) {
                     if (params.is_chem) {
@@ -1315,25 +1368,31 @@
                         dP_dt = -P; // rapidly decay
                         Thrust = 0;
                         dm_dt = 0;
+                        mdot_out = 0;
+                        params.last_temp = params.T_env;
                     } else {
                         // Gas thrust phase (Choked Flow)
                         let pratio = P_atm / P;
-                        let choke_limit = Math.pow(2 / (gamma + 1), gamma / (gamma - 1)); // ~0.528 for air
+
+                        // Wet air choked flow limit
+                        let current_gamma = 1.34; // using wet air
+                        let choke_limit = Math.pow(2 / (current_gamma + 1), current_gamma / (current_gamma - 1)); // ~0.455 for moist air
                         let mdot_gas, v_gas;
 
                         // Adiabatic cooling of the chamber gas
-                        let T_chamber = params.T_env * Math.pow(P / params.P_init, (gamma - 1) / gamma);
+                        let T_chamber = params.T_env * Math.pow(P / params.P_init, (current_gamma - 1) / current_gamma);
+                        params.last_temp = T_chamber;
 
                         if (pratio < choke_limit) { // Choked
-                            v_gas = Math.sqrt(gamma * R_spec * T_chamber);
-                            let coeff = Math.sqrt(gamma / (R_spec * T_chamber)) * Math.pow(2 / (gamma + 1), (gamma + 1) / (2 * (gamma - 1)));
+                            v_gas = Math.sqrt(current_gamma * R_spec * T_chamber);
+                            let coeff = Math.sqrt(current_gamma / (R_spec * T_chamber)) * Math.pow(2 / (current_gamma + 1), (current_gamma + 1) / (2 * (current_gamma - 1)));
                             mdot_gas = params.A_e * P * coeff;
                             Thrust = mdot_gas * v_gas + (P * choke_limit - P_atm) * params.A_e;
                         } else { // Subsonic
-                            let mach_sq = (2 / (gamma - 1)) * (Math.pow(1 / pratio, (gamma - 1) / gamma) - 1);
+                            let mach_sq = (2 / (current_gamma - 1)) * (Math.pow(1 / pratio, (current_gamma - 1) / current_gamma) - 1);
                             mach_sq = Math.max(0, mach_sq);
-                            v_gas = Math.sqrt(mach_sq * gamma * R_spec * T_chamber);
-                            let T_exit = T_chamber / (1 + (gamma - 1) / 2 * mach_sq);
+                            v_gas = Math.sqrt(mach_sq * current_gamma * R_spec * T_chamber);
+                            let T_exit = T_chamber / (1 + (current_gamma - 1) / 2 * mach_sq);
                             let rho_exit = P_atm / (R_spec * T_exit);
                             mdot_gas = params.A_e * rho_exit * v_gas;
                             Thrust = mdot_gas * v_gas;
@@ -1341,15 +1400,34 @@
 
                         let rho_chamber = P / (R_spec * T_chamber);
                         let dV_gas = mdot_gas / rho_chamber;
-                        dP_dt = -gamma * (P / params.V_bottle) * dV_gas;
+                        dP_dt = -current_gamma * (P / V_bottle_actual) * dV_gas;
                         dm_dt = 0; // Gas mass is neglected in structural mass to save computation
+                        mdot_out = mdot_gas;
                     }
                 } else {
                     dP_dt = -P; // Rapidly decay to 0 differential
                     Thrust = 0;
+                    params.last_temp = params.T_env;
                 }
 
                 params.last_Thrust = Thrust; // save for telemetry
+                params.last_mdot = mdot_out;
+
+                // Center of Mass Tracking
+                let L_bottle = params.V_bottle / params.A_ref; // crude cylindrical approx
+                let CoM_dry = L_bottle * 0.4; // roughly
+                let L_water = (m_w / params.rho_fluid) / params.A_ref;
+                let CoM_water = L_bottle - (L_water / 2);
+                let CoM_total = (params.m_dry * CoM_dry + m_w * CoM_water) / m_total;
+                params.last_com = CoM_total;
+
+                // Barrowman Center of Pressure (approx)
+                let CoP = L_bottle * 0.7; // fixed approx for standard fins
+                params.last_cop = CoP;
+
+                // Static Margin
+                let D_ref = Math.sqrt(4 * params.A_ref / Math.PI);
+                params.last_sm = (CoP - CoM_total) / D_ref;
 
                 let ax, ay;
                 if (dist < params.L_tube) {
@@ -1381,6 +1459,14 @@
                     P: new Float64Array(MAX_STEPS),
                     m: new Float64Array(MAX_STEPS),
                     a: new Float64Array(MAX_STEPS),
+                    Fd: new Float64Array(MAX_STEPS),
+                    mdot: new Float64Array(MAX_STEPS),
+                    temp: new Float64Array(MAX_STEPS),
+                    com: new Float64Array(MAX_STEPS),
+                    cop: new Float64Array(MAX_STEPS),
+                    sm: new Float64Array(MAX_STEPS),
+                    dt: new Float64Array(MAX_STEPS),
+                    dV: new Float64Array(MAX_STEPS),
                     ptr: 0,
                     apogee: 0,
                     max_vel: 0,
@@ -1390,16 +1476,28 @@
                 let Y = [0, 0, 0, 0, params.m_water_init, params.P_init];
                 let t = 0;
                 let step_count = 0;
+                let dt = 0.0001; // Initial time step
+                const TOL = 1e-6; // Error tolerance
+
+                // Cash-Karp RK45 coefficients
+                const a21 = 1/5,
+                      a31 = 3/40, a32 = 9/40,
+                      a41 = 3/10, a42 = -9/10, a43 = 6/5,
+                      a51 = -11/54, a52 = 5/2, a53 = -70/27, a54 = 35/27,
+                      a61 = 1631/55296, a62 = 175/512, a63 = 575/13824, a64 = 44275/110592, a65 = 253/4096;
+
+                const c1 = 37/378, c3 = 250/621, c4 = 125/594, c6 = 512/1771;
+                const cs1 = 2825/27648, cs3 = 18575/48384, cs4 = 13525/55296, cs5 = 277/14336, cs6 = 1/4;
+
+                let last_save_time = -1;
 
                 while (Y[1] >= 0 && t < 120 && out.ptr < MAX_STEPS - 1) {
-                    // Dynamic time step: super fine during thrust, coarse during coast
                     let isThrusting = (Y[4] > 0 || Y[5] > P_atm * 1.01);
-                    let dt = isThrusting ? 0.0001 : 0.01;
 
                     // Downsample saving to arrays so charts don't crash browser
-                    let save_interval = isThrusting ? 50 : 2;
+                    let save_interval = isThrusting ? 0.005 : 0.05;
 
-                    if (step_count % save_interval === 0) {
+                    if (t - last_save_time >= save_interval || out.ptr === 0) {
                         // evaluate derivatives just to get the side-effect Thrust for logging
                         this.compute_derivatives(t, Y, params);
                         out.t[out.ptr] = t;
@@ -1410,34 +1508,68 @@
                         out.P[out.ptr] = (Y[5] - P_atm) / 6894.76; // PSI Gauge
                         out.m[out.ptr] = params.m_dry + Math.max(0, Y[4]);
                         out.a[out.ptr] = Math.sqrt(params.last_ax * params.last_ax + params.last_ay * params.last_ay);
+                        out.Fd[out.ptr] = params.last_Fd || 0;
+                        out.mdot[out.ptr] = params.last_mdot || 0;
+                        out.temp[out.ptr] = params.last_temp ? params.last_temp - 273.15 : params.T_env - 273.15;
+                        out.com[out.ptr] = params.last_com || 0;
+                        out.cop[out.ptr] = params.last_cop || 0;
+                        out.sm[out.ptr] = params.last_sm || 0;
+                        out.dt[out.ptr] = dt;
+                        out.dV[out.ptr] = (params.last_dV || 0) * 1000;
 
                         if (Y[1] > out.apogee) out.apogee = Y[1];
                         if (out.v[out.ptr] > out.max_vel) out.max_vel = out.v[out.ptr];
                         if (params.last_Thrust > 0.1) out.burn_time = t;
 
                         out.ptr++;
+                        last_save_time = t;
                     }
 
-                    // RK4 Integration
+                    // RK45 Adaptive Step
                     let k1 = this.compute_derivatives(t, Y, params);
-                    let Y2 = []; for (let i = 0; i < 6; i++) Y2[i] = Y[i] + 0.5 * dt * k1[i];
 
-                    let k2 = this.compute_derivatives(t + 0.5 * dt, Y2, params);
-                    let Y3 = []; for (let i = 0; i < 6; i++) Y3[i] = Y[i] + 0.5 * dt * k2[i];
+                    let Y2 = []; for(let i=0; i<6; i++) Y2[i] = Y[i] + dt * (a21*k1[i]);
+                    let k2 = this.compute_derivatives(t + a21*dt, Y2, params);
 
-                    let k3 = this.compute_derivatives(t + 0.5 * dt, Y3, params);
-                    let Y4 = []; for (let i = 0; i < 6; i++) Y4[i] = Y[i] + dt * k3[i];
+                    let Y3 = []; for(let i=0; i<6; i++) Y3[i] = Y[i] + dt * (a31*k1[i] + a32*k2[i]);
+                    let k3 = this.compute_derivatives(t + (a31+a32)*dt, Y3, params);
 
-                    let k4 = this.compute_derivatives(t + dt, Y4, params);
+                    let Y4 = []; for(let i=0; i<6; i++) Y4[i] = Y[i] + dt * (a41*k1[i] + a42*k2[i] + a43*k3[i]);
+                    let k4 = this.compute_derivatives(t + (a41+a42+a43)*dt, Y4, params);
 
-                    for (let i = 0; i < 6; i++) {
-                        Y[i] = Y[i] + (dt / 6) * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]);
+                    let Y5 = []; for(let i=0; i<6; i++) Y5[i] = Y[i] + dt * (a51*k1[i] + a52*k2[i] + a53*k3[i] + a54*k4[i]);
+                    let k5 = this.compute_derivatives(t + (a51+a52+a53+a54)*dt, Y5, params);
+
+                    let Y6 = []; for(let i=0; i<6; i++) Y6[i] = Y[i] + dt * (a61*k1[i] + a62*k2[i] + a63*k3[i] + a64*k4[i] + a65*k5[i]);
+                    let k6 = this.compute_derivatives(t + (a61+a62+a63+a64+a65)*dt, Y6, params);
+
+                    let y5 = []; // 5th order estimate
+                    let y4 = []; // 4th order estimate
+                    let max_err = 0;
+
+                    for(let i=0; i<6; i++) {
+                        y5[i] = Y[i] + dt * (c1*k1[i] + c3*k3[i] + c4*k4[i] + c6*k6[i]);
+                        y4[i] = Y[i] + dt * (cs1*k1[i] + cs3*k3[i] + cs4*k4[i] + cs5*k5[i] + cs6*k6[i]);
+                        // Calculate error estimate, focusing on velocity and pressure
+                        if (i >= 2) {
+                            let err = Math.abs(y5[i] - y4[i]) / (Math.abs(y5[i]) + 1e-5);
+                            if (err > max_err) max_err = err;
+                        }
                     }
 
-                    // Floor constraints
-                    if (Y[4] < 0) Y[4] = 0; // Water mass can't be negative
+                    if (max_err <= TOL || dt <= 1e-6) {
+                        // Accept step
+                        t += dt;
+                        for(let i=0; i<6; i++) Y[i] = y5[i];
+                        if (Y[4] < 0) Y[4] = 0; // Water mass can't be negative
 
-                    t += dt;
+                        // Increase dt for next step, max 0.05
+                        if (max_err < TOL * 0.1) dt = Math.min(0.05, dt * 1.5);
+                    } else {
+                        // Reject step and decrease dt
+                        dt = Math.max(1e-6, dt * 0.5);
+                    }
+
                     step_count++;
                 }
 
@@ -1672,12 +1804,18 @@
             const labels = {
                 'x': 'Range (m)', 't': 'Time (s)', 'y': 'Altitude (m)',
                 'v': 'Velocity (m/s)', 'a': 'Acceleration (m/s²)',
-                'T': 'Thrust (N)', 'P': 'Pressure (PSI)', 'm': 'Mass (kg)'
+                'T': 'Thrust (N)', 'P': 'Pressure (PSI)', 'm': 'Mass (kg)',
+                'Fd': 'Drag (N)', 'mdot': 'Mass Flow Rate (kg/s)',
+                'temp': 'Internal Temperature (C)', 'com': 'Center of Mass (m)',
+                'cop': 'Center of Pressure (m)', 'sm': 'Static Margin (cal)',
+                'dt': 'Time-step (s)', 'dV': 'Volume Expansion (L)'
             };
 
             const units = {
                 'x': 'm', 't': 's', 'y': 'm', 'v': 'm/s', 'a': 'm/s²',
-                'T': 'N', 'P': 'PSI', 'm': 'kg'
+                'T': 'N', 'P': 'PSI', 'm': 'kg',
+                'Fd': 'N', 'mdot': 'kg/s', 'temp': 'C', 'com': 'm',
+                'cop': 'm', 'sm': 'cal', 'dt': 's', 'dV': 'L'
             };
 
             let useSingleAxis = (y2Key !== 'none' && units[y1Key] === units[y2Key]);
@@ -1951,7 +2089,7 @@ MODE: CHEMICAL REACTION — Baking soda (NaHCO₃) + Vinegar (CH₃COOH) produce
             }
 
             return `# SYSTEM ROLE
-You are **RocketOptimizer-AI**, an expert aerospace engineer and physicist specialized in water rocket propulsion systems. You are embedded in a high-fidelity RK4 (Runge-Kutta 4th order) flight simulation engine.
+You are **RocketOptimizer-AI**, an expert aerospace engineer and physicist specialized in water rocket propulsion systems. You are embedded in a high-fidelity RK45 (Adaptive Cash-Karp) flight simulation engine.
 
 # YOUR MISSION
 Maximize the **horizontal flight range** (meters) of a water rocket by tuning the UNLOCKED parameters below. The simulation uses real physics: Bernoulli thrust, polytropic gas expansion, aerodynamic drag, and ballistic trajectory.
