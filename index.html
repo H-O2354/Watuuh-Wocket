@@ -1365,7 +1365,7 @@
                     if (params.is_chem) {
                         // In chemical mode (foam), gas escapes with the foam.
                         // There is no distinct pure gas thrust phase.
-                        dP_dt = -P; // rapidly decay
+                        dP_dt = -(P - P_atm) * 10; // rapidly decay to atmosphere
                         Thrust = 0;
                         dm_dt = 0;
                         mdot_out = 0;
@@ -1405,7 +1405,7 @@
                         mdot_out = mdot_gas;
                     }
                 } else {
-                    dP_dt = -P; // Rapidly decay to 0 differential
+                    dP_dt = -(P - P_atm) * 10; // Rapidly decay to 0 differential
                     Thrust = 0;
                     params.last_temp = params.T_env;
                 }
@@ -2062,9 +2062,9 @@
             if (history.length > 0) {
                 historyText = '\n=== OPTIMIZATION HISTORY (learn from these results!) ===\n';
                 history.forEach((h, i) => {
-                    historyText += `Round ${i + 1}: ${JSON.stringify(h.params)} → range=${h.range.toFixed(2)}m, apogee=${h.apogee.toFixed(2)}m\n`;
+                    historyText += `Round ${i + 1}: ${JSON.stringify(h.params)} → score=${h.score.toFixed(2)} (range=${h.range.toFixed(2)}m)\n`;
                 });
-                historyText += `\nAnalyze which parameter changes improved or worsened range. Adjust your strategy accordingly. If range=0, the rocket exploded or failed to launch — avoid those parameter combinations.\n`;
+                historyText += `\nAnalyze which parameter changes improved or worsened score. Adjust your strategy accordingly. If score < 0, the rocket exploded or failed to launch — avoid those parameter combinations.\n`;
             }
 
             // Mode-specific physics context
@@ -2095,26 +2095,26 @@ You are **RocketOptimizer-AI**, an expert aerospace engineer and physicist speci
 Maximize the **horizontal flight range** (meters) of a water rocket by tuning the UNLOCKED parameters below. The simulation uses real physics: Bernoulli thrust, polytropic gas expansion, aerodynamic drag, and ballistic trajectory.
 
 # SIMULATION PHYSICS ENGINE
-The simulator solves these ODEs with dt=0.0001s during thrust, dt=0.01s during coast:
+The simulator uses an adaptive Cash-Karp RK45 solver with dynamic dt, solving these advanced models:
 
-1. **Water Thrust Phase**: F_thrust = ṁ·v_e where v_e = √(2·ΔP/ρ_fluid), ṁ = ρ·A_nozzle·v_e
-2. **Gas Thrust Phase** (after water depleted): Choked flow through nozzle when P_atm/P < 0.528
-3. **Launch Tube Phase**: Piston effect F = ΔP·A_tube (rocket accelerates along tube before free flight)
-4. **Drag**: F_drag = ½·ρ_air·v²·Cd·A_ref (opposes motion throughout flight)
-5. **Pressure decay**: P·V^γ = const (γ=1.34 for wet air, adiabatic expansion)
-6. **Trajectory**: After thrust ends, rocket follows ballistic arc under gravity + drag
+1. **Water Thrust Phase (Transient Bernoulli)**: Incorporates rocket acceleration into the effective pressure head: v_e = √[2·( (g + a)·H + ΔP/ρ )].
+2. **Gas Thrust Phase**: Choked flow transitions (Mach 1 limit) adjusting to subsonic flow using wet air approximations (γ ≈ 1.34).
+3. **Structural Elasticity**: The PET bottle volume dynamically expands with internal pressure, affecting the polytropic state.
+4. **Aerodynamic Stability**: Constantly tracks Center of Mass (CoM), Center of Pressure (CoP), and Static Margin.
+5. **Drag**: F_drag = ½·ρ_air·v²·Cd·A_ref.
+6. **Trajectory**: Full ballistic 2D mapping terminating at ground impact.
 ${modeContext}
 
 # OPTIMIZATION STRATEGY GUIDE
-- **Water/liquid ratio**: ~25-40% of bottle volume is the sweet spot. Too little water = insufficient impulse. Too much = excessive dead weight at liftoff, wasting energy fighting gravity.
-- **Launch angle**: For drag-dominated flight, optimal is typically 35-50° (lower than the 45° vacuum optimum because drag penalizes high trajectories more).
-- **Nozzle diameter**: Larger nozzle = higher thrust but shorter burn time (water depletes faster). Smaller nozzle = lower thrust but longer sustained acceleration. There's a sweet spot depending on rocket mass.
-- **Ballast (nose weight)**: Adds stability but increases total mass. Minimize unless stability is needed. Usually 0-0.05kg is sufficient.
-- **Launch tube**: Longer tube = more acceleration before free flight (piston effect), but is limited by bottle geometry.
-- **Pressure**: Higher is better for energy, but MUST stay below burst limit. Leave a safety margin of at least 10 PSI.
-- **Drag coefficient**: Lower is better (streamlined nose cone), realistic range 0.3-0.5 for a bottle rocket.
+- **Water/liquid ratio**: ~25-40% of bottle volume is the sweet spot. Too little water = insufficient impulse. Too much = excessive dead weight at liftoff.
+- **Launch angle**: Optimal is typically 35-50° due to aerodynamic drag penalties at steeper angles.
+- **Nozzle diameter**: Larger nozzle = higher impulse but rapid depletion. Smaller nozzle = longer sustained acceleration.
+- **Ballast (nose weight)**: Adds necessary stability to keep the Static Margin positive, but increases dead weight.
+- **Launch tube**: Longer tube = more "piston" acceleration before free flight.
+- **Pressure constraints**: You MUST ensure "in-pressure" and "in-popoff" are strictly less than "in-burst". If they exceed the burst limit, the vessel explodes and the score is severely penalized (range=0, score < 0).
+- **Drag coefficient**: Lower is better. Typical range 0.3-0.5.
 
-# FAILURE MODES (range = 0)
+# FAILURE MODES (Negative Scores)
 - Pressure ≥ Burst Limit → EXPLOSION
 - In CHEM mode: calculated pressure < Pop-off pressure → FAILED TO LAUNCH
 - In CHEM mode: Pop-off ≥ Burst → EXPLOSION
@@ -2236,14 +2236,14 @@ Respond with ONLY a valid JSON object. No markdown, no explanation outside JSON.
 
                     let simResult = runSim(state);
                     let range = simResult.range || 0;
-                    let apogee = simResult.apogee || 0;
+                    let score = simResult.score || 0;
                     let reasoning = response.reasoning || '';
 
-                    history.push({ params: response.params, range, apogee });
+                    history.push({ params: response.params, range, score });
 
-                    let isBest = range > bestScore;
+                    let isBest = score > bestScore;
                     if (isBest) {
-                        bestScore = range;
+                        bestScore = score;
                         bestResult = simResult;
                         bestParams = { ...state };
                     }
@@ -2388,6 +2388,15 @@ Respond with ONLY a valid JSON object. No markdown, no explanation outside JSON.
                                 if (p.pos[j] > currentNozzle) p.pos[j] = currentNozzle;
                             }
                             state[keys[j]] = p.pos[j];
+                        }
+
+                        // Prevent instant explosion by bounding pressure to burst - 1
+                        let burstLimit = state['in-burst'];
+                        if (state['in-pressure'] !== undefined && state['in-pressure'] >= burstLimit) {
+                            state['in-pressure'] = burstLimit - 1;
+                        }
+                        if (state['in-popoff'] !== undefined && state['in-popoff'] >= burstLimit) {
+                            state['in-popoff'] = burstLimit - 1;
                         }
 
                         let simResult = runSim(state);
