@@ -688,6 +688,38 @@
                             title="Click to Lock/Unlock for Optimizer">🔒</button>
                     </div>
                 </div>
+                <div class="input-row">
+                    <label>Rocket Length (mm)<span class="help-tip" title="Tổng chiều dài tên lửa (mm)">?</span></label>
+                    <div style="display: flex; align-items: center;">
+                        <input type="number" id="in-l-rocket" value="400" step="10" onchange="runSimUI()">
+                        <button class="opt-lock locked" onclick="toggleLock(this)" data-target="in-l-rocket"
+                            title="Click to Lock/Unlock for Optimizer">🔒</button>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <label>Fin Root Chord (mm)<span class="help-tip" title="Chiều dài chân cánh (mm)">?</span></label>
+                    <div style="display: flex; align-items: center;">
+                        <input type="number" id="in-fin-root" value="100" step="5" onchange="runSimUI()">
+                        <button class="opt-lock locked" onclick="toggleLock(this)" data-target="in-fin-root"
+                            title="Click to Lock/Unlock for Optimizer">🔒</button>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <label>Fin Tip Chord (mm)<span class="help-tip" title="Chiều dài chóp cánh (mm)">?</span></label>
+                    <div style="display: flex; align-items: center;">
+                        <input type="number" id="in-fin-tip" value="40" step="5" onchange="runSimUI()">
+                        <button class="opt-lock locked" onclick="toggleLock(this)" data-target="in-fin-tip"
+                            title="Click to Lock/Unlock for Optimizer">🔒</button>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <label>Fin Span (mm)<span class="help-tip" title="Sải cánh mỗi bên (mm)">?</span></label>
+                    <div style="display: flex; align-items: center;">
+                        <input type="number" id="in-fin-span" value="60" step="5" onchange="runSimUI()">
+                        <button class="opt-lock locked" onclick="toggleLock(this)" data-target="in-fin-span"
+                            title="Click to Lock/Unlock for Optimizer">🔒</button>
+                    </div>
+                </div>
                 <div class="input-row" id="row-water-ratio">
                     <label id="lbl-water-ratio">Water Ratio (%)<span class="help-tip"
                             title="Tỉ lệ nước (%)">?</span></label>
@@ -935,40 +967,56 @@
                 <div class="input-row" style="margin: 0;">
                     <label style="color:var(--cyan); margin-right: 5px;">Left Y (Cyan):</label>
                     <select id="sel-y1-axis" onchange="runSimUI()" style="width: 120px;">
-                        <option value="y">Altitude (m)</option>
-                        <option value="v">Velocity (m/s)</option>
-                        <option value="a">Accel. (m/s²)</option>
-                        <option value="T">Thrust (N)</option>
-                        <option value="P">Pressure (PSI)</option>
-                        <option value="m">Mass (kg)</option>
-                        <option value="Fd">Drag (N)</option>
-                        <option value="mdot">Mass Flow Rate (kg/s)</option>
-                        <option value="temp">Int. Temp (C)</option>
-                        <option value="com">Center of Mass (m)</option>
-                        <option value="cop">Center of Pressure (m)</option>
-                        <option value="sm">Static Margin (cal)</option>
-                        <option value="dt">Time-step (s)</option>
-                        <option value="dV">Vol Exp. (L)</option>
+                        <optgroup label="Flight Data">
+                            <option value="y">Altitude (m)</option>
+                            <option value="v">Velocity (m/s)</option>
+                            <option value="a">Accel. (m/s²)</option>
+                        </optgroup>
+                        <optgroup label="Propulsion">
+                            <option value="T">Thrust (N)</option>
+                            <option value="P">Pressure (PSI)</option>
+                            <option value="m">Mass (kg)</option>
+                            <option value="mdot">Mass Flow Rate (kg/s)</option>
+                            <option value="temp">Int. Temp (C)</option>
+                            <option value="dV">Vol Exp. (L)</option>
+                        </optgroup>
+                        <optgroup label="Aerodynamics">
+                            <option value="Fd">Drag (N)</option>
+                            <option value="com">Center of Mass (m)</option>
+                            <option value="cop">Center of Pressure (m)</option>
+                            <option value="sm">Static Margin (cal)</option>
+                        </optgroup>
+                        <optgroup label="System">
+                            <option value="dt">Time-step (s)</option>
+                        </optgroup>
                     </select>
                 </div>
                 <div class="input-row" style="margin: 0;">
                     <label style="color:var(--green); margin-right: 5px;">Right Y (Green):</label>
                     <select id="sel-y2-axis" onchange="runSimUI()" style="width: 120px;">
                         <option value="none">-- None --</option>
-                        <option value="y">Altitude (m)</option>
-                        <option value="v">Velocity (m/s)</option>
-                        <option value="a">Accel. (m/s²)</option>
-                        <option value="T">Thrust (N)</option>
-                        <option value="P">Pressure (PSI)</option>
-                        <option value="m">Mass (kg)</option>
-                        <option value="Fd">Drag (N)</option>
-                        <option value="mdot">Mass Flow Rate (kg/s)</option>
-                        <option value="temp">Int. Temp (C)</option>
-                        <option value="com">Center of Mass (m)</option>
-                        <option value="cop">Center of Pressure (m)</option>
-                        <option value="sm">Static Margin (cal)</option>
-                        <option value="dt">Time-step (s)</option>
-                        <option value="dV">Vol Exp. (L)</option>
+                        <optgroup label="Flight Data">
+                            <option value="y">Altitude (m)</option>
+                            <option value="v">Velocity (m/s)</option>
+                            <option value="a">Accel. (m/s²)</option>
+                        </optgroup>
+                        <optgroup label="Propulsion">
+                            <option value="T">Thrust (N)</option>
+                            <option value="P">Pressure (PSI)</option>
+                            <option value="m">Mass (kg)</option>
+                            <option value="mdot">Mass Flow Rate (kg/s)</option>
+                            <option value="temp">Int. Temp (C)</option>
+                            <option value="dV">Vol Exp. (L)</option>
+                        </optgroup>
+                        <optgroup label="Aerodynamics">
+                            <option value="Fd">Drag (N)</option>
+                            <option value="com">Center of Mass (m)</option>
+                            <option value="cop">Center of Pressure (m)</option>
+                            <option value="sm">Static Margin (cal)</option>
+                        </optgroup>
+                        <optgroup label="System">
+                            <option value="dt">Time-step (s)</option>
+                        </optgroup>
                     </select>
                 </div>
                 <div class="input-row" style="margin: 0; margin-left: auto;">
@@ -1414,20 +1462,45 @@
                 params.last_mdot = mdot_out;
 
                 // Center of Mass Tracking
-                let L_bottle = params.V_bottle / params.A_ref; // crude cylindrical approx
-                let CoM_dry = L_bottle * 0.4; // roughly
+                let L_rocket = params.L_rocket;
+                let CoM_dry = L_rocket * 0.45; // roughly 45% from nose
+
+                // Water volume length and position
                 let L_water = (m_w / params.rho_fluid) / params.A_ref;
-                let CoM_water = L_bottle - (L_water / 2);
+                let CoM_water = L_rocket - (L_water / 2); // Water is at the bottom (rear)
+
                 let CoM_total = (params.m_dry * CoM_dry + m_w * CoM_water) / m_total;
                 params.last_com = CoM_total;
 
-                // Barrowman Center of Pressure (approx)
-                let CoP = L_bottle * 0.7; // fixed approx for standard fins
+                // Full Barrowman Center of Pressure Calculation
+                // 1. Nose Cone Term (Assuming Ogive)
+                let CN_nose = 2.0;
+                let X_nose = 0.466 * (L_rocket * 0.3); // Approx nose length is 30% of total
+
+                // 2. Fin Term (Assuming 3 fins, trapezoidal)
+                let n_fins = 3;
+                let R_body = params.d_body / 2;
+                let C_R = params.fin_root;
+                let C_T = params.fin_tip;
+                let S = params.fin_span;
+
+                let LF_term1 = 1 + (R_body / (R_body + S));
+                let LF_term2 = 4 * n_fins * Math.pow(S / params.d_body, 2);
+                let LF_term3 = 1 + Math.sqrt(1 + Math.pow(2 * S / (C_R + C_T), 2));
+                let CN_fins = LF_term1 * (LF_term2 / LF_term3);
+
+                let X_f = L_rocket - C_R; // Fin start position from nose
+                let XR_term1 = X_f + (C_R / 3);
+                let XR_term2 = (C_R + C_T - (C_R * C_T) / (C_R + C_T)) / 6;
+                let X_fins = XR_term1 + XR_term2;
+
+                // 3. Total CoP
+                let CN_total = CN_nose + CN_fins;
+                let CoP = (CN_nose * X_nose + CN_fins * X_fins) / CN_total;
                 params.last_cop = CoP;
 
                 // Static Margin
-                let D_ref = Math.sqrt(4 * params.A_ref / Math.PI);
-                params.last_sm = (CoP - CoM_total) / D_ref;
+                params.last_sm = (CoP - CoM_total) / params.d_body;
 
                 let ax, ay;
                 if (dist < params.L_tube) {
@@ -1589,6 +1662,11 @@
                 L_tube: val('in-l-tube'),
                 A_tube: Math.PI / 4 * Math.pow(val('in-d-tube') / 1000, 2),
                 A_ref: Math.PI / 4 * Math.pow(val('in-d-body') / 1000, 2),
+                d_body: val('in-d-body') / 1000,
+                L_rocket: val('in-l-rocket') / 1000,
+                fin_root: val('in-fin-root') / 1000,
+                fin_tip: val('in-fin-tip') / 1000,
+                fin_span: val('in-fin-span') / 1000,
                 Cd: val('in-cd'),
                 m_dry: val('in-m-empty') + val('in-m-ballast'),
                 rho_a: val('in-env'),
@@ -2020,7 +2098,9 @@
                 'in-burst': [50, 200], 'in-mass-salt': [1, 200], 'in-vol-vinegar': [100, 2000],
                 'in-acid-conc': [3, 20], 'in-gas-eff': [30, 100], 'in-popoff': [20, 150],
                 'in-d-nozzle': [5, 25], 'in-l-tube': [0, 1.5], 'in-d-tube': [5, 25],
-                'in-d-body': [50, 150], 'in-cd': [0.2, 0.8], 'in-m-empty': [0.05, 0.5],
+                'in-d-body': [50, 150], 'in-l-rocket': [200, 1000], 'in-fin-root': [50, 200],
+                'in-fin-tip': [10, 100], 'in-fin-span': [30, 150],
+                'in-cd': [0.2, 0.8], 'in-m-empty': [0.05, 0.5],
                 'in-m-ballast': [0, 0.5], 'in-angle': [10, 80], 'in-temp': [0, 40]
             };
             const paramDesc = {
@@ -2028,7 +2108,9 @@
                 'in-burst': 'Burst Limit (PSI)', 'in-mass-salt': 'Mass of Salt (g)', 'in-vol-vinegar': 'Vinegar Volume (ml)',
                 'in-acid-conc': 'Acid Concentration (%)', 'in-gas-eff': 'Gas Yield Efficiency (%)', 'in-popoff': 'Pop-off Pressure (PSI)',
                 'in-d-nozzle': 'Nozzle Diameter (mm)', 'in-l-tube': 'Launch Tube Length (m)', 'in-d-tube': 'Launch Tube Diameter (mm)',
-                'in-d-body': 'Body Diameter (mm)', 'in-cd': 'Drag Coefficient', 'in-m-empty': 'Empty Mass (kg)',
+                'in-d-body': 'Body Diameter (mm)', 'in-l-rocket': 'Rocket Length (mm)', 'in-fin-root': 'Fin Root Chord (mm)',
+                'in-fin-tip': 'Fin Tip Chord (mm)', 'in-fin-span': 'Fin Span (mm)',
+                'in-cd': 'Drag Coefficient', 'in-m-empty': 'Empty Mass (kg)',
                 'in-m-ballast': 'Nose Ballast (kg)', 'in-angle': 'Launch Angle (deg)', 'in-temp': 'Air Temperature (C)'
             };
             let unlocked = {}, locked = {};
@@ -2308,6 +2390,10 @@ Respond with ONLY a valid JSON object. No markdown, no explanation outside JSON.
                     'in-l-tube': [0, 1.5],
                     'in-d-tube': [5, 25],
                     'in-d-body': [50, 150],
+                    'in-l-rocket': [200, 1000],
+                    'in-fin-root': [50, 200],
+                    'in-fin-tip': [10, 100],
+                    'in-fin-span': [30, 150],
                     'in-cd': [0.2, 0.8],
                     'in-m-empty': [0.05, 0.5],
                     'in-m-ballast': [0, 0.5],
@@ -2343,7 +2429,7 @@ Respond with ONLY a valid JSON object. No markdown, no explanation outside JSON.
 
                 // Pre-fetch base state to avoid DOM reads during optimization
                 let baseState = { 'in-mode': mode };
-                const allInputIds = ['in-v-bottle', 'in-water-ratio', 'in-pressure', 'in-salt-type', 'in-mass-salt', 'in-vol-vinegar', 'in-acid-conc', 'in-gas-eff', 'in-popoff', 'in-burst', 'in-d-nozzle', 'in-l-tube', 'in-d-tube', 'in-d-body', 'in-cd', 'in-m-empty', 'in-m-ballast', 'in-angle', 'in-temp', 'in-env'];
+                const allInputIds = ['in-v-bottle', 'in-water-ratio', 'in-pressure', 'in-salt-type', 'in-mass-salt', 'in-vol-vinegar', 'in-acid-conc', 'in-gas-eff', 'in-popoff', 'in-burst', 'in-d-nozzle', 'in-l-tube', 'in-d-tube', 'in-d-body', 'in-l-rocket', 'in-fin-root', 'in-fin-tip', 'in-fin-span', 'in-cd', 'in-m-empty', 'in-m-ballast', 'in-angle', 'in-temp', 'in-env'];
                 for (let id of allInputIds) {
                     if (document.getElementById(id)) {
                         baseState[id] = parseFloat(document.getElementById(id).value);
