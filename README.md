@@ -1,4 +1,4 @@
-![Banner](./media/image1.png)
+![Banner](./media/image3.png)
 
 # Demonstration
 
