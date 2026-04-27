@@ -1,7 +1,5 @@
 ![Banner](./media/image1.png)
 
-**TGFuZGluZyE=**
-
-# Physical Engine for Water Rocket
+# Demostrate
 
 ![Physical Engine](./media/image2.png)
