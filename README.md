@@ -1,5 +1,5 @@
 ![Banner](./media/image3.png)
 
-# Demonstration
+# Demo
 
 ![Physical Engine](./media/image2.png)
